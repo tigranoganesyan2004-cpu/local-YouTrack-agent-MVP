@@ -14,7 +14,7 @@ class OllamaClient:
             "prompt": prompt,
             "stream": False,
             "options": {
-                "temperature": 0.1,
+                "temperature": 0,
             },
         }
         response = requests.post(url, json=payload, timeout=240)

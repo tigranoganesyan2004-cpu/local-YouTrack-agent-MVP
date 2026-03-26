@@ -135,10 +135,14 @@ def fallback_result(mode: str, tasks: list[dict], message: str, extra_limitation
 
 
 def pretty_print_response(response: dict) -> str:
-    """
-    Преобразует структурированный ответ агента в текст для консольного интерфейса.
-    """
     lines = []
+
+    used_llm = response.get("used_llm")
+    if used_llm is True:
+        lines.append("[через LLM]")
+    elif used_llm is False:
+        lines.append("[без LLM]")
+
     lines.append(response.get("short_answer", ""))
 
     evidence = response.get("evidence", [])
@@ -153,13 +157,19 @@ def pretty_print_response(response: dict) -> str:
         for item in limitations:
             lines.append(f" - {item}")
 
+    used_ids = response.get("used_issue_ids", [])
+    if used_ids:
+        lines.append("\nИспользованные задачи:")
+        for iid in used_ids:
+            lines.append(f" - {iid}")
+
     tasks = response.get("tasks", [])
     single_task = response.get("task")
     if single_task and not tasks:
         tasks = [single_task]
 
     if tasks:
-        lines.append("\nЗадачи:")
+        lines.append("\nНайденные задачи:")
         for task in tasks[:10]:
             lines.append(
                 f" - {task.get('issue_id', '')} | {task.get('status', '')} | {task.get('priority', '')} | {task.get('summary', '')}"

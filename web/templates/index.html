@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>YouTrack Agent</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>Локальный YouTrack Agent</h1>
+      <div id="system-status" class="status-bar">Загрузка статуса...</div>
+    </header>
+
+    <section class="controls card">
+      <h2>Управление системой</h2>
+      <div class="button-row">
+        <button id="prepare-btn">Подготовить данные</button>
+        <button id="rebuild-btn">Пересобрать индекс</button>
+        <button id="history-btn">Обновить историю</button>
+      </div>
+      <div id="action-result" class="action-result"></div>
+    </section>
+
+    <section class="mode card">
+      <h2>Режим работы</h2>
+      <div class="mode-row">
+        <button class="mode-btn active" data-mode="auto">Авто</button>
+        <button class="mode-btn" data-mode="exact">Точный поиск</button>
+        <button class="mode-btn" data-mode="llm">Через LLM</button>
+      </div>
+      <p class="mode-hint">
+        Авто — агент сам выбирает обработку.
+        Точный — только детерминированный поиск.
+        Через LLM — retrieval + интерпретация через модель.
+      </p>
+    </section>
+
+    <section class="query card">
+      <h2>Запрос</h2>
+      <textarea id="query-input" rows="5" placeholder="Напиши вопрос по-русски..."></textarea>
+      <div class="button-row">
+        <button id="send-btn">Отправить</button>
+      </div>
+      <div class="examples">
+        <strong>Примеры:</strong>
+        <div>Покажи задачу EAIST_SGL-350</div>
+        <div>Найди похожие задачи по уведомлениям</div>
+        <div>Какие сроки горят в ближайшие 10 дней</div>
+      </div>
+    </section>
+
+    <section class="response card">
+      <h2>Ответ агента</h2>
+      <div id="response-box">Пока нет ответа.</div>
+    </section>
+
+    <section class="history card">
+      <h2>История</h2>
+      <div id="history-box">История не загружена.</div>
+    </section>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

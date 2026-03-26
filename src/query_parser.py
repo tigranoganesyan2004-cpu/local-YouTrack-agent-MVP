@@ -2,16 +2,21 @@ import re
 
 
 FIELD_ALIASES = {
+    "статус": "status",
     "status": "status",
     "raw_status": "raw_status",
+    "группа": "workflow_group",
     "status_group": "status_group",
     "workflow_group": "workflow_group",
-    "group": "workflow_group",
+    "приоритет": "priority",
     "priority": "priority",
+    "тип": "doc_type",
+    "тип_документа": "doc_type",
     "doc_type": "doc_type",
-    "doctype": "doc_type",
+    "заказчик": "functional_customer",
     "customer": "functional_customer",
     "functional_customer": "functional_customer",
+    "ответственный": "responsible_dit",
     "responsible": "responsible_dit",
     "responsible_dit": "responsible_dit",
 }
@@ -41,51 +46,48 @@ def detect_intent(user_query: str) -> dict:
     lower = text.lower()
     parts = text.split()
 
-    if lower == "help":
+    if lower in {"помощь", "help"}:
         return {"mode": "help"}
 
-    # команды по первому слову
     first_word = parts[0].lower() if parts else ""
 
-    if first_word == "exact":
-        return {"mode": "exact_search", "query": text[len(parts[0]):].strip()}
-
-    if first_word == "rag":
-        return {"mode": "general_search", "query": text[len(parts[0]):].strip()}
-    
-    if first_word in {"id", "show", "ид", "покажи"} and len(parts) >= 2:
+    # Явные русские команды
+    if first_word in {"ид", "id", "show", "показать"} and len(parts) >= 2:
         return {"mode": "task_by_id", "issue_id": parts[1]}
 
-    if first_word in {"similar", "похожие", "похож"}:
+    if first_word in {"точно", "exact"}:
+        return {"mode": "exact_search", "query": text[len(parts[0]):].strip()}
+
+    if first_word in {"похожие", "similar"}:
         return {"mode": "similar", "query": text[len(parts[0]):].strip()}
 
-    if first_word in {"analyze", "анализ", "проанализируй"}:
+    if first_word in {"анализ", "analyze", "проанализируй"}:
         return {"mode": "analyze_new_task", "query": text[len(parts[0]):].strip()}
 
-    if first_word in {"general", "общий", "общее"}:
+    if first_word in {"общий", "general", "llm", "rag"}:
         return {"mode": "general_search", "query": text[len(parts[0]):].strip()}
 
-    if first_word in {"list", "список", "фильтр"}:
+    if first_word in {"список", "list", "фильтр"}:
         return {"mode": "list", "filters": parse_key_values(parts[1:])}
 
-    if first_word in {"count", "количество", "посчитать"}:
+    if first_word in {"количество", "count", "посчитать"}:
         field = "status"
         lowered_parts = [p.lower() for p in parts]
 
-        if "by" in lowered_parts:
-            idx = lowered_parts.index("by")
+        if "по" in lowered_parts:
+            idx = lowered_parts.index("по")
             if idx + 1 < len(parts):
                 field = FIELD_ALIASES.get(parts[idx + 1].lower(), parts[idx + 1])
 
-        elif "по" in lowered_parts:
-            idx = lowered_parts.index("по")
+        elif "by" in lowered_parts:
+            idx = lowered_parts.index("by")
             if idx + 1 < len(parts):
                 field = FIELD_ALIASES.get(parts[idx + 1].lower(), parts[idx + 1])
 
         filters = parse_key_values(parts[1:])
         return {"mode": "count", "field": field, "filters": filters}
 
-    if first_word in {"deadlines", "сроки", "дедлайны"}:
+    if first_word in {"сроки", "дедлайны", "deadlines"}:
         days = 14
         for part in parts[1:]:
             if part.startswith("days="):
@@ -94,6 +96,8 @@ def detect_intent(user_query: str) -> dict:
                 except ValueError:
                     pass
         return {"mode": "deadlines", "days": days}
+
+    # Эвристики по свободному русскому тексту
     issue_id = extract_issue_id(text)
     if issue_id:
         return {"mode": "task_by_id", "issue_id": issue_id}
@@ -106,7 +110,7 @@ def detect_intent(user_query: str) -> dict:
 
     if "дедлайн" in lower or "срок" in lower:
         days = 14
-        m = re.search(r"(\d+)\s*дн", lower)
+        m = re.search(r"(\d+)\s*(дн|дня|дней)", lower)
         if m:
             days = int(m.group(1))
         return {"mode": "deadlines", "days": days}

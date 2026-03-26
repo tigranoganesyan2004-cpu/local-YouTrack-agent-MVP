@@ -29,50 +29,36 @@ def print_help():
     print("""
 Доступные команды:
 
-  help                                         - показать эту справку
+  помощь                                       - показать эту справку
 
-  id EAIST_SGL-350                             - найти задачу по ID
-  show EAIST_SGL-350                           - показать полную карточку задачи
+  режим авто                                  - агент сам выбирает лучший режим
+  режим точный                                - все следующие запросы идут без LLM
+  режим llm                                   - все следующие запросы идут через retrieval + LLM
 
-  exact <текст>                                - детерминированный поиск без LLM
-  similar <текст>                              - найти похожие задачи
-  похожие <текст>
+  ид EAIST_SGL-350                            - найти задачу по ID
+  показать EAIST_SGL-350                      - показать полную карточку задачи
 
-  анализ <новая постановка>                    - проанализировать новую задачу через аналоги
-  analyze <новая постановка>
+  точно <текст>                               - одноразовый точный поиск без LLM
+  похожие <текст>                             - найти похожие задачи по смыслу
+  анализ <новая постановка>                   - проанализировать новую задачу через аналоги
+  общий <свободный запрос>                    - retrieval + LLM по найденному контексту
 
-  rag <свободный запрос>                       - retrieval + LLM по найденным задачам
-  general <свободный запрос>                   - общий поиск с LLM
-  общий <свободный запрос>
+  список [поле=значение]                      - фильтр по полям
+  пример: список workflow_group=review
 
-  list [поле=значение]                         - фильтр по полям
-  список [поле=значение]
+  количество по <поле> [поле=значение]        - группировка и подсчёт
+  пример: количество по workflow_group
+           количество по status priority=Высокий
 
-  пример:
-    list status=Согласовано
-    list workflow_group=review
-    list priority=Высокий
+  сроки [days=N]                              - дедлайны на ближайшие N дней
+  пример: сроки days=14
 
-  count by <поле> [поле=значение]              - подсчёт задач
-  количество по <поле> [поле=значение]
-
-  пример:
-    count by status
-    count by workflow_group
-    количество по doc_type status=Согласовано
-
-  deadlines [days=N]                           - задачи с истекающими сроками
-  сроки [days=N]
-
-  пример:
-    deadlines days=14
-
-Можно писать и свободно, например:
+Примеры естественных запросов:
   Покажи задачу EAIST_SGL-350
   Найди похожие задачи по уведомлениям
-  Какие дедлайны горят в ближайшие 10 дней
+  Какие сроки горят в ближайшие 10 дней
 
-Рекомендуемый порядок запуска Stage 1:
+Рекомендуемый порядок работы:
   1 -> подготовить данные
   2 -> пересобрать индекс
   3 -> запускать чат
@@ -115,21 +101,28 @@ def can_run_chat() -> tuple[bool, str]:
 
 def run_chat():
     """
-    Запускает интерактивный чат только если система готова:
-    - данные подготовлены
-    - индекс собран
+    Чат работает только на русском интерфейсе.
+    Пользователь может выбрать постоянный режим на сессию:
+    - авто
+    - точный
+    - llm
     """
     ready, message = can_run_chat()
     if not ready:
         print(f"\nЧат недоступен: {message}\n")
         return
 
-    print("\nЧат запущен. Для выхода: exit\n")
+    session_mode = "auto"
+
+    print("\nЧат запущен.")
+    print("Текущий режим: авто")
+    print("Напиши 'помощь', чтобы увидеть команды.")
+    print("Для выхода: выход\n")
 
     while True:
         text = input("Вопрос: ").strip()
 
-        if text.lower() in {"exit", "quit", "выход"}:
+        if text.lower() in {"выход", "exit", "quit"}:
             print("Чат завершен.")
             break
 
@@ -137,19 +130,51 @@ def run_chat():
             print("Пустой запрос. Попробуй еще раз.\n")
             continue
 
-        if text.lower() == "help":
+        lower = text.lower()
+
+        if lower == "помощь":
             print_help()
             continue
 
+        if lower == "режим авто":
+            session_mode = "auto"
+            print("Режим переключен: авто\n")
+            continue
+
+        if lower == "режим точный":
+            session_mode = "exact"
+            print("Режим переключен: точный (без LLM)\n")
+            continue
+
+        if lower == "режим llm":
+            session_mode = "llm"
+            print("Режим переключен: через LLM\n")
+            continue
+
+        # Если пользователь не задал команду явно,
+        # навешиваем выбранный режим сессии автоматически.
+        explicit_prefixes = (
+            "ид ", "показать ", "точно ", "похожие ", "анализ ",
+            "общий ", "список ", "количество ", "сроки ",
+            "help", "id ", "show ", "exact ", "similar ", "analyze ",
+            "general ", "list ", "count ", "deadlines "
+        )
+
+        routed_text = text
+        if not lower.startswith(explicit_prefixes):
+            if session_mode == "exact":
+                routed_text = f"точно {text}"
+            elif session_mode == "llm":
+                routed_text = f"общий {text}"
+
         try:
-            response = run_agent(text)
+            response = run_agent(routed_text)
             print("\nОтвет агента:")
             print("-" * 88)
             print(pretty_print_response(response))
             print("-" * 88 + "\n")
         except Exception as e:
             print(f"Ошибка: {e}\n")
-
 def show_history():
     rows = get_last_history(limit=10)
     if not rows:

@@ -1,0 +1,87 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f4f6f8;
+  color: #1f2937;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 24px auto;
+  padding: 0 16px 32px;
+}
+
+.header {
+  margin-bottom: 20px;
+}
+
+h1, h2 {
+  margin: 0 0 12px;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.status-bar {
+  padding: 10px 12px;
+  background: #eef2ff;
+  border-radius: 8px;
+}
+
+.button-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+button {
+  border: none;
+  background: #2563eb;
+  color: white;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+
+.mode-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mode-btn {
+  background: #6b7280;
+}
+
+.mode-btn.active {
+  background: #059669;
+}
+
+textarea {
+  width: 100%;
+  resize: vertical;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  padding: 12px;
+  box-sizing: border-box;
+  margin-bottom: 12px;
+}
+
+.examples {
+  margin-top: 10px;
+  color: #4b5563;
+}
+
+#response-box, #history-box, #action-result {
+  white-space: pre-wrap;
+  line-height: 1.5;
+}

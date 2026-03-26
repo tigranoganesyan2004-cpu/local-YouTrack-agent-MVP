@@ -80,3 +80,34 @@ def parse_json_safely(raw_text: str) -> dict:
                 pass
 
     raise ValueError("Не удалось распарсить JSON-ответ модели.")
+
+def validate_llm_result(parsed: dict, tasks: list[dict]) -> dict:
+    """
+    Жесткая валидация уже распарсенного ответа модели.
+
+    Здесь мы:
+    - убеждаемся, что short_answer есть;
+    - фильтруем used_issue_ids по реально найденным задачам;
+    - приводим evidence/limitations к спискам.
+    """
+    allowed_ids = {t.get("issue_id") for t in tasks if t.get("issue_id")}
+
+    if not isinstance(parsed, dict):
+        raise ValueError("Ответ модели не является JSON-объектом.")
+
+    if "short_answer" not in parsed or not str(parsed.get("short_answer", "")).strip():
+        raise ValueError("В ответе модели нет short_answer.")
+
+    used_ids = parsed.get("used_issue_ids", [])
+    if not isinstance(used_ids, list):
+        used_ids = []
+
+    parsed["used_issue_ids"] = [x for x in used_ids if x in allowed_ids]
+
+    if "evidence" not in parsed or not isinstance(parsed["evidence"], list):
+        parsed["evidence"] = []
+
+    if "limitations" not in parsed or not isinstance(parsed["limitations"], list):
+        parsed["limitations"] = []
+
+    return parsed
