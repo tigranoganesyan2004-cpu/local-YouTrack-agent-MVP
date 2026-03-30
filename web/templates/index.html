@@ -2,76 +2,222 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1"
+  />
   <title>YouTrack Agent</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <div class="container">
-    <header class="header">
-      <h1>Локальный YouTrack Agent</h1>
-      <div id="system-status" class="status-bar">Загрузка статуса...</div>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand-mark">YT</div>
+        <div>
+          <h1 class="app-title">YouTrack Agent</h1>
+          <p class="app-subtitle">
+            Локальный аналитический агент по задачам и согласованиям
+          </p>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <button id="refreshBootstrapBtn" class="btn btn-secondary" type="button">
+          Обновить UI
+        </button>
+      </div>
     </header>
 
-    <section class="controls card">
-      <h2>Управление системой</h2>
-      <div class="button-row">
-        <button id="prepare-btn">Подготовить данные</button>
-        <button id="rebuild-btn">Пересобрать индекс</button>
-        <button id="history-btn">Обновить историю</button>
-      </div>
-      <div id="action-result" class="action-result"></div>
-    </section>
+    <main class="layout">
+      <section class="panel panel-status">
+        <div class="panel-header">
+          <h2>Состояние системы</h2>
+          <span id="statusUpdatedAt" class="muted"></span>
+        </div>
+        <div id="statusBadges" class="status-badges"></div>
+      </section>
 
-    <section class="mode card">
-      <h2>Режим работы</h2>
-      <div class="mode-row">
-        <button class="mode-btn active" data-mode="auto">Авто</button>
-        <button class="mode-btn" data-mode="exact">Точный поиск</button>
-        <button class="mode-btn" data-mode="llm">Через LLM</button>
-      </div>
-      <p class="mode-hint">
-        Авто — агент сам выбирает обработку.
-        Точный — только детерминированный поиск.
-        Через LLM — retrieval + интерпретация через модель.
-      </p>
-    </section>
+      <section class="panel panel-dashboard">
+        <div class="panel-header">
+          <h2>Dashboard</h2>
+          <span class="muted">Сводка по текущему датасету</span>
+        </div>
 
-    <section class="query card">
-      <h2>Запрос</h2>
-    
-      <div class="request-meta">
-        <div id="request-state" class="request-state">Готов к работе</div>
-        <div id="request-timer" class="request-timer">00:00</div>
-      </div>
-    
-      <textarea id="query-input" rows="5" placeholder="Напиши вопрос по-русски..."></textarea>
-    
-      <div class="button-row">
-        <button id="send-btn">Отправить</button>
-        <button id="stop-btn" disabled>Остановить</button>
-      </div>
-    
-      <div class="examples">
-        <strong>Примеры:</strong>
-        <div>Покажи задачу EAIST_SGL-350</div>
-        <div>Найди похожие задачи по уведомлениям</div>
-        <div>Какие сроки горят в ближайшие 10 дней</div>
-      </div>
-    </section>
-    
-    <section class="response card">
-      <h2>Ответ агента</h2>
-      <div id="response-box" class="response-box">
-        <div class="empty-state">Пока нет ответа.</div>
-      </div>
-    </section>
+        <div id="dashboardCards" class="dashboard-grid"></div>
 
-    <section class="history card">
-      <h2>История</h2>
-      <div id="history-box">История не загружена.</div>
-    </section>
+        <div class="dashboard-lists">
+          <div class="subpanel">
+            <div class="subpanel-title">Топ статусов</div>
+            <div id="topStatuses" class="mini-list"></div>
+          </div>
+
+          <div class="subpanel">
+            <div class="subpanel-title">Топ заказчиков</div>
+            <div id="topCustomers" class="mini-list"></div>
+          </div>
+
+          <div class="subpanel">
+            <div class="subpanel-title">Топ ответственных</div>
+            <div id="topResponsibles" class="mini-list"></div>
+          </div>
+
+          <div class="subpanel">
+            <div class="subpanel-title">Текущие стадии согласования</div>
+            <div id="topApprovalStages" class="mini-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel-query">
+        <div class="panel-header">
+          <h2>Спросить агента</h2>
+          <span class="muted">Свободный вопрос по задачам, срокам и согласованиям</span>
+        </div>
+
+        <div class="query-controls">
+          <div class="query-input-wrap">
+            <label class="label" for="queryInput">Запрос</label>
+            <textarea
+              id="queryInput"
+              class="query-input"
+              rows="4"
+              placeholder="Например: Что ждёт согласования от ДИТ?"
+              autocomplete="off"
+            ></textarea>
+            <div id="suggestionsBox" class="suggestions hidden"></div>
+          </div>
+
+          <div class="query-side">
+            <label class="label" for="modeSelect">Режим</label>
+            <select id="modeSelect" class="select">
+              <option value="auto">Auto</option>
+              <option value="exact">Exact</option>
+              <option value="llm">LLM</option>
+              <option value="deep">Deep analysis</option>
+            </select>
+
+            <div class="actions-column">
+              <button id="runQueryBtn" class="btn btn-primary" type="button">
+                Запустить
+              </button>
+              <button id="stopQueryBtn" class="btn btn-danger" type="button" disabled>
+                Остановить
+              </button>
+              <button id="exportBtn" class="btn btn-secondary" type="button" disabled>
+                Экспорт CSV
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="streamBox" class="stream-box hidden">
+          <div class="stream-header">
+            <span>Промежуточный ответ модели</span>
+            <span id="streamState" class="muted"></span>
+          </div>
+          <pre id="streamOutput" class="stream-output"></pre>
+        </div>
+      </section>
+
+      <section class="panel panel-examples">
+        <div class="panel-header">
+          <h2>Быстрые примеры</h2>
+          <span class="muted">Кликабельные категории запросов</span>
+        </div>
+
+        <div id="exampleCategories" class="example-categories"></div>
+        <div id="exampleExamples" class="example-examples"></div>
+      </section>
+
+      <section class="panel panel-results">
+        <div class="panel-header">
+          <h2>Результат</h2>
+          <span id="resultMeta" class="muted"></span>
+        </div>
+
+        <div id="resultEmpty" class="empty-state">
+          Пока нет результата. Запусти запрос выше.
+        </div>
+
+        <div id="resultContent" class="hidden">
+          <div class="result-summary-card">
+            <div class="result-summary-top">
+              <div>
+                <div class="result-label">Краткий вывод</div>
+                <div id="shortAnswer" class="result-short-answer"></div>
+              </div>
+              <div class="result-badges">
+                <span id="confidenceBadge" class="badge"></span>
+                <span id="llmBadge" class="badge"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="result-sections-grid">
+            <div class="subpanel">
+              <div class="subpanel-title">Основание</div>
+              <ul id="evidenceList" class="list"></ul>
+            </div>
+
+            <div class="subpanel">
+              <div class="subpanel-title">Ограничения</div>
+              <ul id="limitationsList" class="list"></ul>
+            </div>
+
+            <div class="subpanel">
+              <div class="subpanel-title">Применённые фильтры</div>
+              <ul id="filtersList" class="list"></ul>
+            </div>
+
+            <div class="subpanel">
+              <div class="subpanel-title">Использованные задачи</div>
+              <ul id="usedIdsList" class="list"></ul>
+            </div>
+          </div>
+
+          <div id="itemsBlock" class="subpanel hidden">
+            <div class="subpanel-title">Детали результата</div>
+            <div id="itemsContainer"></div>
+          </div>
+
+          <div id="tasksBlock" class="subpanel hidden">
+            <div class="subpanel-title">Найденные задачи</div>
+            <div id="tasksContainer" class="task-cards"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel-history">
+        <div class="panel-header">
+          <h2>Последние запросы</h2>
+          <button id="refreshHistoryBtn" class="btn btn-secondary" type="button">
+            Обновить историю
+          </button>
+        </div>
+        <div id="historyContainer" class="history-list"></div>
+      </section>
+
+      <section class="panel panel-admin">
+        <div class="panel-header">
+          <h2>Сервисные действия</h2>
+          <span class="muted">Подготовка данных и пересборка индекса</span>
+        </div>
+
+        <div class="admin-actions">
+          <button id="prepareBtn" class="btn btn-secondary" type="button">
+            Подготовить данные
+          </button>
+          <button id="rebuildBtn" class="btn btn-secondary" type="button">
+            Пересобрать индекс
+          </button>
+        </div>
+
+        <div id="adminLog" class="admin-log"></div>
+      </section>
+    </main>
   </div>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js" defer></script>
 </body>
 </html>

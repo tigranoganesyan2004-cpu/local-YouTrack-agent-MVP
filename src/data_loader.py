@@ -1,14 +1,18 @@
 from pathlib import Path
+
 import pandas as pd
 
 from src.config import RAW_DIR
+from src.schema import REQUIRED_SOURCE_COLUMNS
+from src.utils import clean_column_name
 
 
 def discover_input_files() -> dict:
     """
-    Ищет входные файлы в data/raw.
-    Сейчас поддерживаем XLSX и CSV.
-    Если есть оба формата, потом склеим их в один DataFrame.
+    Ищет все входные файлы в data/raw.
+
+    Мы читаем все XLSX и CSV, а не только первый файл,
+    чтобы потом детерминированно объединить и дедуплицировать записи.
     """
     xlsx_files = sorted(RAW_DIR.glob("*.xlsx"))
     csv_files = sorted(RAW_DIR.glob("*.csv"))
@@ -19,46 +23,85 @@ def discover_input_files() -> dict:
         )
 
     return {
-        "xlsx": xlsx_files[0] if xlsx_files else None,
-        "csv": csv_files[0] if csv_files else None,
+        "xlsx": xlsx_files,
+        "csv": csv_files,
     }
 
 
-def load_xlsx(path: Path):
-    """
-    Читает Excel-выгрузку.
-    """
-    return pd.read_excel(path)
+def normalize_dataframe_columns(df: pd.DataFrame) -> pd.DataFrame:
+    cleaned = df.copy()
+    cleaned.columns = [clean_column_name(col) for col in cleaned.columns]
+    return cleaned
 
 
-def load_csv(path: Path):
+def validate_required_columns(df: pd.DataFrame, path: Path) -> None:
+    missing = [col for col in REQUIRED_SOURCE_COLUMNS if col not in df.columns]
+    if missing:
+        raise ValueError(
+            f"В файле {path.name} не хватает обязательных колонок: {', '.join(missing)}"
+        )
+
+
+def attach_source_metadata(df: pd.DataFrame, path: Path, source_type: str) -> pd.DataFrame:
+    enriched = df.copy()
+    enriched["__source_file"] = path.name
+    enriched["__source_path"] = str(path)
+    enriched["__source_type"] = source_type
+    enriched["__source_row"] = range(2, len(enriched) + 2)
+    return enriched
+
+
+def load_xlsx(path: Path) -> pd.DataFrame:
+    df = pd.read_excel(path)
+    df = normalize_dataframe_columns(df)
+    validate_required_columns(df, path)
+    return attach_source_metadata(df, path, "xlsx")
+
+
+def load_csv(path: Path) -> pd.DataFrame:
     """
-    Читает CSV-выгрузку.
-    sep=None + engine='python' позволяет pandas самому угадать разделитель.
+    encoding='utf-8-sig' убирает BOM.
+    После этого дополнительно чистим названия колонок.
     """
-    return pd.read_csv(path, sep=None, engine="python")
+    df = pd.read_csv(path, sep=None, engine="python", encoding="utf-8-sig")
+    df = normalize_dataframe_columns(df)
+    validate_required_columns(df, path)
+    return attach_source_metadata(df, path, "csv")
 
 
 def load_source_dataframe():
     """
-    Загружает все доступные источники и склеивает их в один DataFrame.
-
-    Зачем это нужно:
-    - иногда у нас есть и XLSX, и CSV;
-    - не нужно вручную решать, какой файл брать;
-    - вся очистка и дедупликация будет уже после объединения.
+    Возвращает:
+    - объединенный DataFrame
+    - metadata по источникам
     """
     files = discover_input_files()
     frames = []
 
-    if files["xlsx"] is not None:
-        frames.append(load_xlsx(files["xlsx"]))
+    for path in files["xlsx"]:
+        frames.append(load_xlsx(path))
 
-    if files["csv"] is not None:
-        frames.append(load_csv(files["csv"]))
+    for path in files["csv"]:
+        frames.append(load_csv(path))
 
     if not frames:
         raise FileNotFoundError("Не найдено входных файлов.")
 
     df = pd.concat(frames, ignore_index=True, sort=False)
-    return df, files
+
+    rows_by_source = {
+        "xlsx": 0,
+        "csv": 0,
+    }
+
+    for frame in frames:
+        source_type = frame["__source_type"].iloc[0]
+        rows_by_source[source_type] += len(frame)
+
+    meta = {
+        "xlsx": files["xlsx"],
+        "csv": files["csv"],
+        "rows_by_source": rows_by_source,
+    }
+
+    return df, meta
