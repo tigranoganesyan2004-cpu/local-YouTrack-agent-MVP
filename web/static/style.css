@@ -84,4 +84,86 @@ textarea {
 #response-box, #history-box, #action-result {
   white-space: pre-wrap;
   line-height: 1.5;
+} 
+
+.request-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.request-state {
+  font-weight: 600;
+}
+
+.request-timer {
+  font-family: monospace;
+  font-size: 16px;
+  background: #eef2ff;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.response-box {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.response-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.response-mode {
+  font-weight: 700;
+}
+
+.response-meta {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.response-short-answer {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.response-section {
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.response-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.tasks-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tasks-table th,
+.tasks-table td {
+  border: 1px solid #e5e7eb;
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.empty-state {
+  color: #6b7280;
+}
+
+.error-state {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.warning-state {
+  color: #92400e;
+  font-weight: 600;
 }

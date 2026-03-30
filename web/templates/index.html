@@ -38,10 +38,19 @@
 
     <section class="query card">
       <h2>Запрос</h2>
+    
+      <div class="request-meta">
+        <div id="request-state" class="request-state">Готов к работе</div>
+        <div id="request-timer" class="request-timer">00:00</div>
+      </div>
+    
       <textarea id="query-input" rows="5" placeholder="Напиши вопрос по-русски..."></textarea>
+    
       <div class="button-row">
         <button id="send-btn">Отправить</button>
+        <button id="stop-btn" disabled>Остановить</button>
       </div>
+    
       <div class="examples">
         <strong>Примеры:</strong>
         <div>Покажи задачу EAIST_SGL-350</div>
@@ -49,10 +58,12 @@
         <div>Какие сроки горят в ближайшие 10 дней</div>
       </div>
     </section>
-
+    
     <section class="response card">
       <h2>Ответ агента</h2>
-      <div id="response-box">Пока нет ответа.</div>
+      <div id="response-box" class="response-box">
+        <div class="empty-state">Пока нет ответа.</div>
+      </div>
     </section>
 
     <section class="history card">

@@ -180,18 +180,36 @@ def show_history():
     if not rows:
         print("История пока пуста.")
         return
+
     print("\nПоследние записи истории:\n")
+
     for row in rows:
-        created_at, query_mode, query_text, answer_text, found_issue_ids = row
+        (
+            created_at,
+            query_mode,
+            query_text,
+            answer_text,
+            found_issue_ids,
+            duration_ms,
+            llm_used,
+            error_text,
+        ) = row
+
         print("=" * 88)
         print("Время:", created_at)
         print("Режим:", query_mode)
         print("Вопрос:", query_text)
-        print("Найденные задачи:", found_issue_ids)
-        print("Ответ:")
-        print(answer_text[:800] + ("..." if len(answer_text) > 800 else ""))
-        print("=" * 88)
+        print("Найденные задачи:", found_issue_ids or "—")
+        print("Длительность (мс):", duration_ms or 0)
+        print("LLM:", "да" if llm_used else "нет")
 
+        if error_text:
+            print("Ошибка:", error_text)
+
+        print("Ответ:")
+        preview = answer_text[:800] + ("..." if len(answer_text) > 800 else "")
+        print(preview)
+        print("=" * 88)
 
 def main():
     bootstrap_project()

@@ -217,4 +217,5 @@ def run_agent(user_query: str) -> dict:
     except Exception:
         pass
 
+    result["duration_ms"] = duration_ms
     return result
