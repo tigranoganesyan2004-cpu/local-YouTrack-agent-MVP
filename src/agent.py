@@ -139,6 +139,7 @@ def _build_applied_filters(intent: dict) -> list[str]:
         "doc_type",
         "functional_customer",
         "responsible_dit",
+        "current_approval_stage",
     ]:
         value = safe_str(filters.get(key))
         if value:
@@ -211,6 +212,7 @@ def _apply_filters(intent: dict) -> list[dict]:
         doc_type=filters.get("doc_type"),
         functional_customer=filters.get("functional_customer"),
         responsible_dit=filters.get("responsible_dit"),
+        current_approval_stage=filters.get("current_approval_stage"),
         active_only=intent.get("active_only"),
         final_only=intent.get("final_only"),
         overdue_only=bool(intent.get("overdue_only", False)),

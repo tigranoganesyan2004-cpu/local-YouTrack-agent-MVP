@@ -5,58 +5,11 @@ const state = {
   streamBuffer: "",
   suggestionTimer: null,
   selectedExampleCategoryId: null,
+  historyCollapsed: false,
 };
 
-const els = {
-  refreshBootstrapBtn: document.getElementById("refreshBootstrapBtn"),
-  statusUpdatedAt: document.getElementById("statusUpdatedAt"),
-  statusBadges: document.getElementById("statusBadges"),
-
-  dashboardCards: document.getElementById("dashboardCards"),
-  topStatuses: document.getElementById("topStatuses"),
-  topCustomers: document.getElementById("topCustomers"),
-  topResponsibles: document.getElementById("topResponsibles"),
-  topApprovalStages: document.getElementById("topApprovalStages"),
-
-  queryInput: document.getElementById("queryInput"),
-  runQueryBtn: document.getElementById("runQueryBtn"),
-  stopQueryBtn: document.getElementById("stopQueryBtn"),
-  exportBtn: document.getElementById("exportBtn"),
-
-  suggestionsBox: document.getElementById("suggestionsBox"),
-
-  progressBox: document.getElementById("progressBox"),
-  progressText: document.getElementById("progressText"),
-
-  exampleCategories: document.getElementById("exampleCategories"),
-  exampleExamples: document.getElementById("exampleExamples"),
-
-  resultMeta: document.getElementById("resultMeta"),
-  resultEmpty: document.getElementById("resultEmpty"),
-  resultContent: document.getElementById("resultContent"),
-
-  shortAnswer: document.getElementById("shortAnswer"),
-  confidenceBadge: document.getElementById("confidenceBadge"),
-  llmBadge: document.getElementById("llmBadge"),
-  evidenceList: document.getElementById("evidenceList"),
-  limitationsList: document.getElementById("limitationsList"),
-  filtersList: document.getElementById("filtersList"),
-  usedIdsList: document.getElementById("usedIdsList"),
-
-  itemsBlock: document.getElementById("itemsBlock"),
-  itemsContainer: document.getElementById("itemsContainer"),
-  tasksBlock: document.getElementById("tasksBlock"),
-  tasksContainer: document.getElementById("tasksContainer"),
-
-  historyContainer: document.getElementById("historyContainer"),
-  refreshHistoryBtn: document.getElementById("refreshHistoryBtn"),
-
-  adminToggleBtn: document.getElementById("adminToggleBtn"),
-  adminSection: document.getElementById("adminSection"),
-  prepareBtn: document.getElementById("prepareBtn"),
-  rebuildBtn: document.getElementById("rebuildBtn"),
-  adminLog: document.getElementById("adminLog"),
-};
+// els is populated inside init() after DOMContentLoaded to guarantee DOM availability
+const els = {};
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -195,51 +148,6 @@ function renderStatus(payload) {
   els.statusUpdatedAt.textContent = `Обновлено: ${formatNow()}`;
 }
 
-function renderDashboardCards(dashboard) {
-  const kpis = dashboard?.kpis || {};
-
-  const cards = [
-    { title: "Всего задач", value: kpis.total || 0, tone: "neutral" },
-    { title: "Активные", value: kpis.active || 0, tone: "success" },
-    { title: "Финальные", value: kpis.final || 0, tone: "muted" },
-    { title: "Просрочено", value: kpis.overdue || 0, tone: "warning" },
-    { title: "С замечаниями", value: kpis.with_remarks || 0, tone: "info" },
-    { title: "На согласовании", value: kpis.pending_approvals || 0, tone: "review" },
-  ];
-
-  els.dashboardCards.innerHTML = cards.map(card => `
-    <div class="kpi-card ${card.tone}">
-      <div class="kpi-title">${escapeHtml(card.title)}</div>
-      <div class="kpi-value">${Number(card.value || 0)}</div>
-    </div>
-  `).join("");
-}
-
-function renderTupleList(container, items, emptyText = "Нет данных") {
-  if (!Array.isArray(items) || items.length === 0) {
-    container.innerHTML = `<div class="muted">${escapeHtml(emptyText)}</div>`;
-    return;
-  }
-
-  container.innerHTML = items.map(item => {
-    const name = Array.isArray(item) ? item[0] : item?.name;
-    const count = Array.isArray(item) ? item[1] : item?.count;
-    return `
-      <div class="mini-list-item">
-        <span class="mini-list-name">${escapeHtml(name)}</span>
-        <span class="mini-list-count">${Number(count || 0)}</span>
-      </div>
-    `;
-  }).join("");
-}
-
-function renderDashboard(dashboard) {
-  renderDashboardCards(dashboard);
-  renderTupleList(els.topStatuses, dashboard?.top_statuses, "Нет статусов");
-  renderTupleList(els.topCustomers, dashboard?.top_customers, "Нет заказчиков");
-  renderTupleList(els.topResponsibles, dashboard?.top_responsibles, "Нет ответственных");
-  renderTupleList(els.topApprovalStages, dashboard?.top_current_approval_stages, "Нет стадий согласования");
-}
 
 function renderExampleCategories(categories) {
   if (!Array.isArray(categories)) {
@@ -520,7 +428,6 @@ async function loadBootstrap() {
   state.bootstrap = data;
 
   renderStatus(data);
-  renderDashboard(data.dashboard);
   renderExampleCategories(data.examples || []);
 
   if (!state.selectedExampleCategoryId && Array.isArray(data.examples) && data.examples[0]) {
@@ -795,7 +702,16 @@ async function runRebuild() {
   }
 }
 
+function toggleHistory() {
+  state.historyCollapsed = !state.historyCollapsed;
+  els.historyContainer.classList.toggle("hidden", state.historyCollapsed);
+  els.historyToggleBtn.textContent = state.historyCollapsed
+    ? "Развернуть ▾"
+    : "Свернуть ▴";
+}
+
 function bindEvents() {
+  try {
   els.adminToggleBtn.addEventListener("click", () => {
     els.adminSection.classList.toggle("hidden");
     const open = !els.adminSection.classList.contains("hidden");
@@ -820,6 +736,7 @@ function bindEvents() {
   els.prepareBtn.addEventListener("click", runPrepare);
   els.rebuildBtn.addEventListener("click", runRebuild);
   els.refreshHistoryBtn.addEventListener("click", loadHistory);
+  els.historyToggleBtn.addEventListener("click", toggleHistory);
 
   els.queryInput.addEventListener("input", scheduleSuggestions);
 
@@ -880,16 +797,68 @@ function bindEvents() {
       closeSuggestions();
     }
   });
+  } catch (e) {
+    console.error("bindEvents error:", e);
+  }
 }
 
 async function init() {
+  // Populate els after DOM is ready
+  els.refreshBootstrapBtn = document.getElementById("refreshBootstrapBtn");
+  els.statusUpdatedAt = document.getElementById("statusUpdatedAt");
+  els.statusBadges = document.getElementById("statusBadges");
+
+  els.queryInput = document.getElementById("queryInput");
+  els.runQueryBtn = document.getElementById("runQueryBtn");
+  els.stopQueryBtn = document.getElementById("stopQueryBtn");
+  els.exportBtn = document.getElementById("exportBtn");
+
+  els.suggestionsBox = document.getElementById("suggestionsBox");
+
+  els.progressBox = document.getElementById("progressBox");
+  els.progressText = document.getElementById("progressText");
+
+  els.exampleCategories = document.getElementById("exampleCategories");
+  els.exampleExamples = document.getElementById("exampleExamples");
+
+  els.resultMeta = document.getElementById("resultMeta");
+  els.resultEmpty = document.getElementById("resultEmpty");
+  els.resultContent = document.getElementById("resultContent");
+
+  els.shortAnswer = document.getElementById("shortAnswer");
+  els.confidenceBadge = document.getElementById("confidenceBadge");
+  els.llmBadge = document.getElementById("llmBadge");
+  els.evidenceList = document.getElementById("evidenceList");
+  els.limitationsList = document.getElementById("limitationsList");
+  els.filtersList = document.getElementById("filtersList");
+  els.usedIdsList = document.getElementById("usedIdsList");
+
+  els.itemsBlock = document.getElementById("itemsBlock");
+  els.itemsContainer = document.getElementById("itemsContainer");
+  els.tasksBlock = document.getElementById("tasksBlock");
+  els.tasksContainer = document.getElementById("tasksContainer");
+
+  els.historyContainer = document.getElementById("historyContainer");
+  els.refreshHistoryBtn = document.getElementById("refreshHistoryBtn");
+  els.historyToggleBtn = document.getElementById("historyToggleBtn");
+
+  els.adminToggleBtn = document.getElementById("adminToggleBtn");
+  els.adminSection = document.getElementById("adminSection");
+  els.prepareBtn = document.getElementById("prepareBtn");
+  els.rebuildBtn = document.getElementById("rebuildBtn");
+  els.adminLog = document.getElementById("adminLog");
+
   bindEvents();
   renderResult(null);
 
   try {
     await loadBootstrap();
   } catch (error) {
-    showAdminLog(error.message || "Ошибка загрузки bootstrap", "error");
+    const msg = error.message || "Ошибка загрузки данных";
+    showAdminLog(msg, "error");
+    if (els.resultEmpty) {
+      els.resultEmpty.textContent = `Данные не загружены: ${msg}. Откройте «Сервисные действия» и нажмите «Подготовить данные».`;
+    }
   }
 
   try {

@@ -7,7 +7,7 @@
     content="width=device-width, initial-scale=1, maximum-scale=1"
   />
   <title>YouTrack Agent</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v=2" />
 </head>
 <body>
   <div class="app-shell">
@@ -128,43 +128,17 @@
         </div>
       </section>
 
-      <section class="panel panel-dashboard">
-        <div class="panel-header">
-          <h2>Dashboard</h2>
-          <span class="muted">Сводка по текущему датасету</span>
-        </div>
-
-        <div id="dashboardCards" class="dashboard-grid"></div>
-
-        <div class="dashboard-lists">
-          <div class="subpanel">
-            <div class="subpanel-title">Топ статусов</div>
-            <div id="topStatuses" class="mini-list"></div>
-          </div>
-
-          <div class="subpanel">
-            <div class="subpanel-title">Топ заказчиков</div>
-            <div id="topCustomers" class="mini-list"></div>
-          </div>
-
-          <div class="subpanel">
-            <div class="subpanel-title">Топ ответственных</div>
-            <div id="topResponsibles" class="mini-list"></div>
-          </div>
-
-          <div class="subpanel">
-            <div class="subpanel-title">Текущие стадии согласования</div>
-            <div id="topApprovalStages" class="mini-list"></div>
-          </div>
-        </div>
-      </section>
-
       <section class="panel panel-history">
         <div class="panel-header">
           <h2>Последние запросы</h2>
-          <button id="refreshHistoryBtn" class="btn btn-secondary" type="button">
-            Обновить историю
-          </button>
+          <div class="panel-header-actions">
+            <button id="refreshHistoryBtn" class="btn btn-secondary btn-sm" type="button">
+              Обновить
+            </button>
+            <button id="historyToggleBtn" class="btn btn-secondary btn-sm" type="button">
+              Свернуть ▴
+            </button>
+          </div>
         </div>
         <div id="historyContainer" class="history-list"></div>
       </section>
@@ -199,6 +173,6 @@
     </main>
   </div>
 
-  <script src="/static/app.js" defer></script>
+  <script src="/static/app.js?v=2" defer></script>
 </body>
 </html>

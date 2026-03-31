@@ -232,6 +232,7 @@ def _task_matches_base_filters(
     doc_type: str | None = None,
     functional_customer: str | None = None,
     responsible_dit: str | None = None,
+    current_approval_stage: str | None = None,
     active_only: bool | None = None,
     final_only: bool | None = None,
     overdue_only: bool = False,
@@ -260,6 +261,9 @@ def _task_matches_base_filters(
         return False
 
     if responsible_dit and not _match_field(task.get("responsible_dit", ""), responsible_dit):
+        return False
+
+    if current_approval_stage and not _match_field(task.get("current_approval_stage", ""), current_approval_stage):
         return False
 
     if active_only is True and not is_active_task(task):
@@ -300,6 +304,7 @@ def filter_tasks(
     doc_type: str | None = None,
     functional_customer: str | None = None,
     responsible_dit: str | None = None,
+    current_approval_stage: str | None = None,
     active_only: bool | None = None,
     final_only: bool | None = None,
     overdue_only: bool = False,
@@ -324,6 +329,7 @@ def filter_tasks(
             doc_type=doc_type,
             functional_customer=functional_customer,
             responsible_dit=responsible_dit,
+            current_approval_stage=current_approval_stage,
             active_only=active_only,
             final_only=final_only,
             overdue_only=overdue_only,

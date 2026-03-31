@@ -26,6 +26,10 @@ FIELD_ALIASES = {
     "ид": "issue_id",
     "id": "issue_id",
     "issue_id": "issue_id",
+    "стадия": "current_approval_stage",
+    "стадии": "current_approval_stage",
+    "стадию": "current_approval_stage",
+    "current_approval_stage": "current_approval_stage",
 }
 
 COUNT_FIELD_ALIASES = {
@@ -238,15 +242,19 @@ def _extract_explicit_filters_from_text(text: str) -> dict:
         filters["doc_type"] = doc_type
 
     customer_match = re.search(
-        r"(?:заказчик(?:а|ом)?|customer)\s+([A-Za-zА-Яа-яЁё0-9_\-]{2,40})",
+        r'(?:заказчик(?:а|ом)?|customer)\s+'
+        r'(?:"([^"]{2,80})"|\'([^\']{2,80})\'|'
+        r'([A-Za-zА-Яа-яЁё0-9_\-]{2,40}(?:\s+[A-Za-zА-Яа-яЁё0-9_\-]{2,40}){0,2}))',
         raw_text,
         flags=re.IGNORECASE,
     )
     if customer_match:
-        filters["functional_customer"] = customer_match.group(1)
+        value = (customer_match.group(1) or customer_match.group(2) or customer_match.group(3) or "").strip()
+        if value:
+            filters["functional_customer"] = value
 
     responsible_match = re.search(
-        r"(?:ответствен(?:ный|ного)(?:\s*\(дит\))?|responsible)\s+([A-Za-zА-Яа-яЁё0-9_\-]{2,40})",
+        r"(?:ответствен(?:ный|ного)(?:\s*\(дит\))?|responsible)\s+([A-Za-zА-Яа-яЁё0-9_\-\.]{2,40})",
         raw_text,
         flags=re.IGNORECASE,
     )
@@ -254,7 +262,7 @@ def _extract_explicit_filters_from_text(text: str) -> dict:
         filters["responsible_dit"] = responsible_match.group(1)
 
     if "responsible_dit" not in filters and "functional_customer" not in filters:
-        m_latin = re.search(r"\bу\s+([A-Z][A-Z0-9_\-]{1,20})\b", raw_text)
+        m_latin = re.search(r"\bу\s+([A-Z][A-Z0-9_\-.]{1,20})\b", raw_text)
         m_cyr = re.search(r"\bу\s+([А-ЯЁ]{2,20})\b", raw_text)
 
         if m_latin:
