@@ -1,7 +1,7 @@
 import json
 from time import perf_counter
 
-from src.config import DEEP_ANALYSIS_TOP_K, FAST_ANALYSIS_TOP_K
+from src.config import DEEP_ANALYSIS_TOP_K, FAST_ANALYSIS_TOP_K, USE_CRITIC_PASS
 from src.query_parser import detect_intent
 from src.search_engine import (
     aggregate_counts,
@@ -406,21 +406,24 @@ def _run_two_pass_llm(
 
     critic_failed_reason = ""
 
-    try:
-        critic_prompt = build_critic_prompt(
-            user_query=user_query,
-            tasks=tasks,
-            mode=mode,
-            draft_result=analyst_parsed,
-            analysis_profile=analysis_profile,
-            extra_context=extra_context,
-        )
-        critic_raw = ollama_client.generate(critic_prompt)
-        critic_parsed = parse_json_safely(critic_raw)
-        critic_parsed = validate_llm_result(critic_parsed, tasks)
-        final_parsed = critic_parsed
-    except Exception as e:
-        critic_failed_reason = str(e)
+    if USE_CRITIC_PASS:
+        try:
+            critic_prompt = build_critic_prompt(
+                user_query=user_query,
+                tasks=tasks,
+                mode=mode,
+                draft_result=analyst_parsed,
+                analysis_profile=analysis_profile,
+                extra_context=extra_context,
+            )
+            critic_raw = ollama_client.generate(critic_prompt)
+            critic_parsed = parse_json_safely(critic_raw)
+            critic_parsed = validate_llm_result(critic_parsed, tasks)
+            final_parsed = critic_parsed
+        except Exception as e:
+            critic_failed_reason = str(e)
+            final_parsed = analyst_parsed
+    else:
         final_parsed = analyst_parsed
 
     result = llm_result(final_parsed, mode, tasks)

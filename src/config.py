@@ -30,6 +30,10 @@ YOUTRACK_PROJECT = os.getenv("YOUTRACK_PROJECT", "")
 # Отключён по умолчанию (Stage 1). Включить: USE_RERANKER=true в .env
 USE_RERANKER: bool = os.getenv("USE_RERANKER", "false").strip().lower() != "false"
 
+# Critic pass (второй LLM-вызов для срезания неподтверждённых формулировок).
+# Отключён по умолчанию (Stage 1). Включить: USE_CRITIC_PASS=true в .env
+USE_CRITIC_PASS: bool = os.getenv("USE_CRITIC_PASS", "false").strip().lower() != "false"
+
 # -------------------------------------------------------------------
 # LLM-heavy режим
 # -------------------------------------------------------------------
