@@ -22,101 +22,41 @@
         </div>
       </div>
 
-      <div class="topbar-right">
-        <button id="refreshBootstrapBtn" class="btn btn-secondary" type="button">
-          Обновить UI
-        </button>
-      </div>
     </header>
 
     <main class="layout">
-      <section class="panel panel-status">
-        <div class="panel-header">
-          <h2>Состояние системы</h2>
-          <span id="statusUpdatedAt" class="muted"></span>
-        </div>
-        <div id="statusBadges" class="status-badges"></div>
-      </section>
-
-      <section class="panel panel-dashboard">
-        <div class="panel-header">
-          <h2>Dashboard</h2>
-          <span class="muted">Сводка по текущему датасету</span>
-        </div>
-
-        <div id="dashboardCards" class="dashboard-grid"></div>
-
-        <div class="dashboard-lists">
-          <div class="subpanel">
-            <div class="subpanel-title">Топ статусов</div>
-            <div id="topStatuses" class="mini-list"></div>
-          </div>
-
-          <div class="subpanel">
-            <div class="subpanel-title">Топ заказчиков</div>
-            <div id="topCustomers" class="mini-list"></div>
-          </div>
-
-          <div class="subpanel">
-            <div class="subpanel-title">Топ ответственных</div>
-            <div id="topResponsibles" class="mini-list"></div>
-          </div>
-
-          <div class="subpanel">
-            <div class="subpanel-title">Текущие стадии согласования</div>
-            <div id="topApprovalStages" class="mini-list"></div>
-          </div>
-        </div>
-      </section>
-
       <section class="panel panel-query">
         <div class="panel-header">
           <h2>Спросить агента</h2>
           <span class="muted">Свободный вопрос по задачам, срокам и согласованиям</span>
         </div>
 
-        <div class="query-controls">
-          <div class="query-input-wrap">
-            <label class="label" for="queryInput">Запрос</label>
-            <textarea
-              id="queryInput"
-              class="query-input"
-              rows="4"
-              placeholder="Например: Что ждёт согласования от ДИТ?"
-              autocomplete="off"
-            ></textarea>
-            <div id="suggestionsBox" class="suggestions hidden"></div>
-          </div>
-
-          <div class="query-side">
-            <label class="label" for="modeSelect">Режим</label>
-            <select id="modeSelect" class="select">
-              <option value="auto">Auto</option>
-              <option value="exact">Exact</option>
-              <option value="llm">LLM</option>
-              <option value="deep">Deep analysis</option>
-            </select>
-
-            <div class="actions-column">
-              <button id="runQueryBtn" class="btn btn-primary" type="button">
-                Запустить
-              </button>
-              <button id="stopQueryBtn" class="btn btn-danger" type="button" disabled>
-                Остановить
-              </button>
-              <button id="exportBtn" class="btn btn-secondary" type="button" disabled>
-                Экспорт CSV
-              </button>
-            </div>
-          </div>
+        <div class="query-input-wrap">
+          <textarea
+            id="queryInput"
+            class="query-input"
+            rows="3"
+            placeholder="Например: Что ждёт согласования от ДИТ?"
+            autocomplete="off"
+          ></textarea>
+          <div id="suggestionsBox" class="suggestions hidden"></div>
         </div>
 
-        <div id="streamBox" class="stream-box hidden">
-          <div class="stream-header">
-            <span>Промежуточный ответ модели</span>
-            <span id="streamState" class="muted"></span>
-          </div>
-          <pre id="streamOutput" class="stream-output"></pre>
+        <div class="query-actions">
+          <button id="runQueryBtn" class="btn btn-primary" type="button">
+            Запустить
+          </button>
+          <button id="stopQueryBtn" class="btn btn-danger" type="button" disabled>
+            Прервать вывод
+          </button>
+          <button id="exportBtn" class="btn btn-secondary" type="button" disabled>
+            Экспорт CSV
+          </button>
+        </div>
+
+        <div id="progressBox" class="progress-box hidden">
+          <div class="progress-spinner"></div>
+          <span id="progressText">Обработка запроса…</span>
         </div>
       </section>
 
@@ -188,6 +128,37 @@
         </div>
       </section>
 
+      <section class="panel panel-dashboard">
+        <div class="panel-header">
+          <h2>Dashboard</h2>
+          <span class="muted">Сводка по текущему датасету</span>
+        </div>
+
+        <div id="dashboardCards" class="dashboard-grid"></div>
+
+        <div class="dashboard-lists">
+          <div class="subpanel">
+            <div class="subpanel-title">Топ статусов</div>
+            <div id="topStatuses" class="mini-list"></div>
+          </div>
+
+          <div class="subpanel">
+            <div class="subpanel-title">Топ заказчиков</div>
+            <div id="topCustomers" class="mini-list"></div>
+          </div>
+
+          <div class="subpanel">
+            <div class="subpanel-title">Топ ответственных</div>
+            <div id="topResponsibles" class="mini-list"></div>
+          </div>
+
+          <div class="subpanel">
+            <div class="subpanel-title">Текущие стадии согласования</div>
+            <div id="topApprovalStages" class="mini-list"></div>
+          </div>
+        </div>
+      </section>
+
       <section class="panel panel-history">
         <div class="panel-header">
           <h2>Последние запросы</h2>
@@ -198,22 +169,32 @@
         <div id="historyContainer" class="history-list"></div>
       </section>
 
-      <section class="panel panel-admin">
-        <div class="panel-header">
-          <h2>Сервисные действия</h2>
-          <span class="muted">Подготовка данных и пересборка индекса</span>
-        </div>
+      <section class="panel panel-admin-wrap">
+        <button id="adminToggleBtn" class="admin-toggle-btn" type="button">
+          Сервисные действия ▾
+        </button>
 
-        <div class="admin-actions">
-          <button id="prepareBtn" class="btn btn-secondary" type="button">
-            Подготовить данные
-          </button>
-          <button id="rebuildBtn" class="btn btn-secondary" type="button">
-            Пересобрать индекс
-          </button>
-        </div>
+        <div id="adminSection" class="admin-section hidden">
+          <div class="admin-status-row">
+            <h3>Состояние системы</h3>
+            <div id="statusBadges" class="status-badges"></div>
+            <span id="statusUpdatedAt" class="muted"></span>
+          </div>
 
-        <div id="adminLog" class="admin-log"></div>
+          <div class="admin-actions">
+            <button id="prepareBtn" class="btn btn-secondary" type="button">
+              Подготовить данные
+            </button>
+            <button id="rebuildBtn" class="btn btn-secondary" type="button">
+              Пересобрать индекс
+            </button>
+            <button id="refreshBootstrapBtn" class="btn btn-secondary" type="button">
+              Обновить UI
+            </button>
+          </div>
+
+          <div id="adminLog" class="admin-log"></div>
+        </div>
       </section>
     </main>
   </div>

@@ -255,14 +255,16 @@ button {
   font-weight: 700;
 }
 
-.query-controls {
-  display: grid;
-  grid-template-columns: 1fr 220px;
-  gap: 16px;
-}
-
 .query-input-wrap {
   position: relative;
+  margin-bottom: 12px;
+}
+
+.query-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 0;
 }
 
 .label {
@@ -285,7 +287,7 @@ button {
 
 .query-input {
   resize: vertical;
-  min-height: 120px;
+  min-height: 90px;
   line-height: 1.45;
 }
 
@@ -295,16 +297,31 @@ button {
   box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.12);
 }
 
-.query-side {
+.progress-box {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(79, 140, 255, 0.06);
+  color: var(--muted);
+  font-size: 14px;
 }
 
-.actions-column {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.progress-spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(79, 140, 255, 0.25);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .btn {
@@ -388,35 +405,36 @@ button {
   word-break: break-word;
 }
 
-.stream-box {
-  margin-top: 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.03);
-  overflow: hidden;
-}
-
-.stream-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
+.admin-toggle-btn {
+  width: 100%;
+  background: transparent;
+  border: none;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
+  padding: 4px 0;
+  text-align: left;
+  cursor: pointer;
 }
 
-.stream-output {
-  margin: 0;
-  padding: 14px;
-  min-height: 90px;
-  max-height: 320px;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 13px;
+.admin-toggle-btn:hover {
+  color: var(--text);
+}
+
+.admin-section {
+  margin-top: 14px;
+}
+
+.admin-status-row {
+  margin-bottom: 14px;
+}
+
+.admin-status-row h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.panel-admin-wrap {
+  border-color: rgba(38, 50, 71, 0.6);
 }
 
 .example-categories {
@@ -714,8 +732,9 @@ button {
 }
 
 @media (max-width: 920px) {
-  .query-controls {
-    grid-template-columns: 1fr;
+  .query-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .result-sections-grid {
@@ -737,11 +756,6 @@ button {
   .topbar {
     flex-direction: column;
     align-items: stretch;
-  }
-
-  .topbar-right {
-    display: flex;
-    justify-content: flex-end;
   }
 }
 

@@ -19,16 +19,14 @@ const els = {
   topApprovalStages: document.getElementById("topApprovalStages"),
 
   queryInput: document.getElementById("queryInput"),
-  modeSelect: document.getElementById("modeSelect"),
   runQueryBtn: document.getElementById("runQueryBtn"),
   stopQueryBtn: document.getElementById("stopQueryBtn"),
   exportBtn: document.getElementById("exportBtn"),
 
   suggestionsBox: document.getElementById("suggestionsBox"),
 
-  streamBox: document.getElementById("streamBox"),
-  streamState: document.getElementById("streamState"),
-  streamOutput: document.getElementById("streamOutput"),
+  progressBox: document.getElementById("progressBox"),
+  progressText: document.getElementById("progressText"),
 
   exampleCategories: document.getElementById("exampleCategories"),
   exampleExamples: document.getElementById("exampleExamples"),
@@ -53,6 +51,8 @@ const els = {
   historyContainer: document.getElementById("historyContainer"),
   refreshHistoryBtn: document.getElementById("refreshHistoryBtn"),
 
+  adminToggleBtn: document.getElementById("adminToggleBtn"),
+  adminSection: document.getElementById("adminSection"),
   prepareBtn: document.getElementById("prepareBtn"),
   rebuildBtn: document.getElementById("rebuildBtn"),
   adminLog: document.getElementById("adminLog"),
@@ -581,26 +581,14 @@ function scheduleSuggestions() {
   }, 220);
 }
 
-function resetStreamingBox() {
+function showProgress(text = "Обработка запроса…") {
   state.streamBuffer = "";
-  els.streamOutput.textContent = "";
-  els.streamState.textContent = "";
-  els.streamBox.classList.add("hidden");
+  els.progressText.textContent = text;
+  els.progressBox.classList.remove("hidden");
 }
 
-function startStreamingUI() {
-  els.streamBox.classList.remove("hidden");
-  els.streamState.textContent = "Идет генерация...";
-  els.streamOutput.textContent = "";
-}
-
-function appendStreamToken(token) {
-  state.streamBuffer += token;
-  els.streamOutput.textContent = state.streamBuffer;
-}
-
-function finishStreamingUI(message = "Готово") {
-  els.streamState.textContent = message;
+function hideProgress() {
+  els.progressBox.classList.add("hidden");
 }
 
 function setQueryRunning(isRunning) {
@@ -644,7 +632,7 @@ function parseSingleSseEvent(rawEvent) {
 
 async function runQueryStream() {
   const query = els.queryInput.value.trim();
-  const mode = els.modeSelect.value;
+  const mode = "auto";
 
   if (!query) {
     alert("Введите запрос.");
@@ -658,12 +646,10 @@ async function runQueryStream() {
   state.abortController = new AbortController();
   state.lastResult = null;
   setQueryRunning(true);
-  resetStreamingBox();
   renderResult(null);
+  showProgress();
 
   try {
-    startStreamingUI();
-
     const response = await fetch("/api/query-stream", {
       method: "POST",
       headers: {
@@ -675,7 +661,7 @@ async function runQueryStream() {
     });
 
     if (!response.ok || !response.body) {
-      throw new Error("Стриминговый ответ недоступен.");
+      throw new Error("Ответ сервера недоступен.");
     }
 
     const reader = response.body.getReader();
@@ -695,28 +681,27 @@ async function runQueryStream() {
         const { eventName, data } = parseSingleSseEvent(rawEvent);
 
         if (eventName === "token") {
-          appendStreamToken(String(data.text || ""));
+          state.streamBuffer += String(data.text || "");
         } else if (eventName === "result") {
+          hideProgress();
           renderResult(data);
         } else if (eventName === "done") {
-          finishStreamingUI("Готово");
+          hideProgress();
         }
       }
     }
 
     if (!state.lastResult) {
-      // fallback на обычный запрос, если stream дал сбой без final result
       const data = await apiPost("/api/query", { query, mode });
+      hideProgress();
       renderResult(data);
-      finishStreamingUI("Финальный ответ получен без стрима");
     }
   } catch (error) {
+    hideProgress();
+
     if (error.name === "AbortError") {
-      finishStreamingUI("Остановлено пользователем");
       return;
     }
-
-    resetStreamingBox();
 
     try {
       const data = await apiPost("/api/query", { query, mode });
@@ -742,7 +727,7 @@ function stopQuery() {
 
 async function exportCurrentResult() {
   const query = els.queryInput.value.trim();
-  const mode = els.modeSelect.value;
+  const mode = "auto";
 
   if (!query) {
     alert("Сначала введи запрос.");
@@ -811,6 +796,14 @@ async function runRebuild() {
 }
 
 function bindEvents() {
+  els.adminToggleBtn.addEventListener("click", () => {
+    els.adminSection.classList.toggle("hidden");
+    const open = !els.adminSection.classList.contains("hidden");
+    els.adminToggleBtn.textContent = open
+      ? "Сервисные действия ▴"
+      : "Сервисные действия ▾";
+  });
+
   els.refreshBootstrapBtn.addEventListener("click", async () => {
     try {
       await loadBootstrap();
@@ -891,7 +884,6 @@ function bindEvents() {
 
 async function init() {
   bindEvents();
-  resetStreamingBox();
   renderResult(null);
 
   try {
