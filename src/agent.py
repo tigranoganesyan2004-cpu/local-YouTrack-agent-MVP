@@ -33,16 +33,10 @@ from src.history_store import save_history
 from src.utils import safe_str
 
 
-LLM_HEAVY_MODES = {
-    "list",
-    "count",
-    "deadlines",
-    "approval_status",
-    "overdue",
-    "stats",
-    "by_customer",
-    "by_responsible",
-    "with_remarks",
+# Modes where LLM synthesis genuinely adds value (retrieval-first, then LLM).
+# Deterministic modes (list, count, deadlines, stats, overdue, approval_status,
+# by_customer, by_responsible, with_remarks) must NOT use LLM in auto mode.
+LLM_SYNTHESIS_MODES = {
     "similar",
     "analyze_new_task",
     "general_search",
@@ -446,7 +440,7 @@ def _run_two_pass_llm(
 def _should_use_llm(mode: str, analysis_profile: str) -> bool:
     if analysis_profile == "deep":
         return True
-    return mode in LLM_HEAVY_MODES
+    return mode in LLM_SYNTHESIS_MODES
 
 
 def run_agent(user_query: str) -> dict:

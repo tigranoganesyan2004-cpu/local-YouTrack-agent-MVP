@@ -1,0 +1,29 @@
+---
+description: Stage 1 workflow and mandatory docs
+alwaysApply: true
+---
+
+# Stage 1 mandatory workflow
+
+Before making any code changes, you must first read these files:
+
+- docs/ai/IMPLEMENTATION_GUIDE_FOR_STAGE1.md
+- docs/ai/CLAUDE_CURSOR_RULES.md
+- docs/ai/STAGE1_MASTER_PLAN_SYNTHESIS.md
+
+Then inspect the relevant code before proposing edits.
+
+Follow these project priorities strictly:
+1. reliability
+2. grounded answers
+3. simplicity for business analysts
+4. low CPU/RAM load on the current laptop
+5. future extensibility only if it adds near-zero current complexity
+
+Default policy:
+- prefer deterministic logic over LLM logic
+- prefer disabling heavy features over tuning around them
+- keep one main user flow in public UI
+- keep changes small and commit-friendly
+- explain touched files before editing
+- provide verification steps after editing

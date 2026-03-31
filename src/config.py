@@ -27,8 +27,8 @@ YOUTRACK_TOKEN = os.getenv("YOUTRACK_TOKEN", "")
 YOUTRACK_PROJECT = os.getenv("YOUTRACK_PROJECT", "")
 
 # Re-ranking через CrossEncoder.
-# Отключить: добавить USE_RERANKER=false в .env
-USE_RERANKER: bool = os.getenv("USE_RERANKER", "true").strip().lower() != "false"
+# Отключён по умолчанию (Stage 1). Включить: USE_RERANKER=true в .env
+USE_RERANKER: bool = os.getenv("USE_RERANKER", "false").strip().lower() != "false"
 
 # -------------------------------------------------------------------
 # LLM-heavy режим

@@ -1,0 +1,24 @@
+---
+description: Prevent scope creep in Stage 1
+alwaysApply: true
+---
+
+
+# Stage 1 scope guard
+
+This repository is a lightweight Stage 1 local YouTrack AI agent.
+
+Do not introduce or enable by default unless explicitly requested and benchmark-justified:
+- public deep/thinking modes
+- streaming chain-of-thought or reasoning output
+- always-on reranker
+- critic pass by default
+- multi-step LLM chains
+- memory-based multi-turn LLM context
+- heavy frontend rewrites
+- Stage 2/3 machinery in active Stage 1 paths
+
+When unsure, prefer:
+- hidden
+- disabled by default
+- scaffold only

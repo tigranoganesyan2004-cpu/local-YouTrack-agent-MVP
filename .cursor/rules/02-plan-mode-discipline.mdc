@@ -1,0 +1,19 @@
+---
+description: Force safe planning before larger changes
+alwaysApply: true
+---
+
+# Plan mode discipline
+
+For medium or large tasks:
+- first create a plan
+- do not edit files until the plan is shown
+- list exact files likely to change
+- keep the plan Stage-1-scoped
+- avoid unrelated refactors
+- wait for approval before broad implementation
+
+For small tasks:
+- still state touched files before editing
+- keep the patch minimal
+- summarize exact effect after editing
