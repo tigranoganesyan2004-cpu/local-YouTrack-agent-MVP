@@ -12,7 +12,14 @@ from src.answer_builder import fallback_result, llm_result
 from src.config import DATASET_REPORT_JSON, OLLAMA_HOST, TASKS_JSON
 from src.data_prepare import has_prepared_tasks, save_prepared_tasks
 from src.dataset_lifecycle import load_active_dataset_metadata
-from src.history_store import get_last_history, save_history
+from src.history_store import (
+    create_chat_session,
+    delete_chat_session,
+    get_chat_messages,
+    get_last_history,
+    list_chat_sessions,
+    save_history,
+)
 from src.ollama_client import ollama_client
 from src.prompts import build_llm_prompt
 from src.query_parser import detect_intent
@@ -711,17 +718,17 @@ def export_results_action(query: str, mode: str) -> tuple[bytes, str]:
     return _build_csv_bytes(rows, ["short_answer"]), "agent_result_export.csv"
 
 
-def stream_agent_service(query: str, web_mode: str) -> Generator[str, None, None]:
+def stream_agent_service(query: str, web_mode: str, chat_id: str = "") -> Generator[str, None, None]:
     started = perf_counter()
     routed_query = _route_query(query, web_mode)
     intent = detect_intent(routed_query)
     intent_mode = intent["mode"]
 
-    # Для не-LLM режимов не стримим токены, а просто шлем final result
     if intent_mode not in _STREAMING_MODES:
         result = run_agent(routed_query)
         yield f"event: result\ndata: {json.dumps(result, ensure_ascii=False)}\n\n"
         yield "event: done\ndata: {}\n\n"
+        _save_stream_history(routed_query, intent_mode, result, [], started, llm_used=0, chat_id=chat_id)
         return
 
     search_query = intent.get("query", routed_query)
@@ -741,7 +748,7 @@ def stream_agent_service(query: str, web_mode: str) -> Generator[str, None, None
         yield f"event: result\ndata: {json.dumps(result, ensure_ascii=False)}\n\n"
         yield "event: done\ndata: {}\n\n"
 
-        _save_stream_history(routed_query, intent_mode, result, retrieved_ids, started, llm_used=0)
+        _save_stream_history(routed_query, intent_mode, result, retrieved_ids, started, llm_used=0, chat_id=chat_id)
         return
 
     prompt = build_llm_prompt(routed_query, tasks, intent_mode)
@@ -765,7 +772,7 @@ def stream_agent_service(query: str, web_mode: str) -> Generator[str, None, None
         yield f"event: result\ndata: {json.dumps(result, ensure_ascii=False)}\n\n"
         yield "event: done\ndata: {}\n\n"
 
-        _save_stream_history(routed_query, intent_mode, result, retrieved_ids, started, llm_used=0)
+        _save_stream_history(routed_query, intent_mode, result, retrieved_ids, started, llm_used=0, chat_id=chat_id)
         return
 
     llm_used = 0
@@ -789,7 +796,7 @@ def stream_agent_service(query: str, web_mode: str) -> Generator[str, None, None
     yield f"event: result\ndata: {json.dumps(result, ensure_ascii=False)}\n\n"
     yield "event: done\ndata: {}\n\n"
 
-    _save_stream_history(routed_query, intent_mode, result, retrieved_ids, started, llm_used=llm_used)
+    _save_stream_history(routed_query, intent_mode, result, retrieved_ids, started, llm_used=llm_used, chat_id=chat_id)
 
 
 def _save_stream_history(
@@ -799,6 +806,7 @@ def _save_stream_history(
     retrieved_ids: list[str],
     started: float,
     llm_used: int,
+    chat_id: str = "",
 ) -> None:
     try:
         save_history(
@@ -810,6 +818,27 @@ def _save_stream_history(
             duration_ms=int((perf_counter() - started) * 1000),
             llm_used=llm_used,
             error_text="",
+            chat_id=chat_id,
         )
     except Exception:
         pass
+
+
+# ── chat session service layer ───────────────────────────────────
+
+def create_chat_action(title: str = "") -> dict:
+    return create_chat_session(title=title)
+
+
+def list_chats_action(limit: int = 50) -> list[dict]:
+    return list_chat_sessions(limit=limit)
+
+
+def get_chat_messages_action(chat_id: str) -> list[dict]:
+    return get_chat_messages(chat_id)
+
+
+def delete_chat_action(chat_id: str) -> bool:
+    return delete_chat_session(chat_id)
+
+

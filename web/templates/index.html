@@ -7,12 +7,15 @@
     content="width=device-width, initial-scale=1, maximum-scale=1"
   />
   <title>YouTrack Agent</title>
-  <link rel="stylesheet" href="/static/style.css?v=2" />
+  <link rel="stylesheet" href="/static/style.css?v=4" />
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
       <div class="topbar-left">
+        <button id="sidebarToggleBtn" class="sidebar-toggle-btn" type="button" title="Показать/скрыть панель чатов">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="2" rx="1" fill="currentColor"/><rect x="2" y="9" width="16" height="2" rx="1" fill="currentColor"/><rect x="2" y="14" width="16" height="2" rx="1" fill="currentColor"/></svg>
+        </button>
         <div class="brand-mark">YT</div>
         <div>
           <h1 class="app-title">YouTrack Agent</h1>
@@ -21,163 +24,158 @@
           </p>
         </div>
       </div>
-
     </header>
 
-    <main class="layout">
-      <section class="panel panel-query">
-        <div class="panel-header">
-          <h2>Спросить агента</h2>
-          <span class="muted">Свободный вопрос по задачам, срокам и согласованиям</span>
+    <div class="app-body">
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+          <button id="newChatBtn" class="btn btn-primary btn-sm sidebar-new-chat" type="button">+ Новый чат</button>
         </div>
+        <div id="chatList" class="chat-list"></div>
+      </aside>
 
-        <div class="query-input-wrap">
-          <textarea
-            id="queryInput"
-            class="query-input"
-            rows="3"
-            placeholder="Например: Что ждёт согласования от ДИТ?"
-            autocomplete="off"
-          ></textarea>
-          <div id="suggestionsBox" class="suggestions hidden"></div>
-        </div>
+      <main class="layout">
+        <div id="chatThread" class="chat-thread hidden"></div>
 
-        <div class="mode-toggle" role="group" aria-label="Режим ответа">
-          <button id="modeAiBtn" class="btn btn-mode active" type="button">AI Answer</button>
-          <button id="modePreciseBtn" class="btn btn-mode" type="button">Precise Mode</button>
-        </div>
+        <section class="panel panel-query">
+          <div class="panel-header">
+            <h2>Спросить агента</h2>
+            <span class="muted">Свободный вопрос по задачам, срокам и согласованиям</span>
+          </div>
 
-        <div class="query-actions">
-          <button id="runQueryBtn" class="btn btn-primary" type="button">
-            Запустить
-          </button>
-          <button id="stopQueryBtn" class="btn btn-danger" type="button" disabled>
-            Прервать вывод
-          </button>
-          <button id="exportBtn" class="btn btn-secondary" type="button" disabled>
-            Экспорт CSV
-          </button>
-        </div>
+          <div class="query-input-wrap">
+            <textarea
+              id="queryInput"
+              class="query-input"
+              rows="3"
+              placeholder="Например: Что ждёт согласования от ДИТ?"
+              autocomplete="off"
+            ></textarea>
+            <div id="suggestionsBox" class="suggestions hidden"></div>
+          </div>
 
-        <div id="progressBox" class="progress-box hidden">
-          <div class="progress-spinner"></div>
-          <span id="progressText">Обработка запроса…</span>
-        </div>
-      </section>
+          <div class="mode-toggle" role="group" aria-label="Режим ответа">
+            <button id="modeAiBtn" class="btn btn-mode active" type="button">AI Answer</button>
+            <button id="modePreciseBtn" class="btn btn-mode" type="button">Precise Mode</button>
+          </div>
 
-      <section class="panel panel-examples">
-        <div class="panel-header">
-          <h2>Быстрые примеры</h2>
-          <span class="muted">Кликабельные категории запросов</span>
-        </div>
+          <div class="query-actions">
+            <button id="runQueryBtn" class="btn btn-primary" type="button">
+              Запустить
+            </button>
+            <button id="stopQueryBtn" class="btn btn-danger" type="button" disabled>
+              Прервать вывод
+            </button>
+            <button id="exportBtn" class="btn btn-secondary" type="button" disabled>
+              Экспорт CSV
+            </button>
+          </div>
 
-        <div id="exampleCategories" class="example-categories"></div>
-        <div id="exampleExamples" class="example-examples"></div>
-      </section>
+          <div id="progressBox" class="progress-box hidden">
+            <div class="progress-spinner"></div>
+            <span id="progressText">Обработка запроса…</span>
+          </div>
+        </section>
 
-      <section class="panel panel-results">
-        <div class="panel-header">
-          <h2>Результат</h2>
-          <span id="resultMeta" class="muted"></span>
-        </div>
+        <section class="panel panel-examples">
+          <div class="panel-header">
+            <h2>Быстрые примеры</h2>
+            <span class="muted">Кликабельные категории запросов</span>
+          </div>
 
-        <div id="resultEmpty" class="empty-state">
-          Пока нет результата. Запусти запрос выше.
-        </div>
+          <div id="exampleCategories" class="example-categories"></div>
+          <div id="exampleExamples" class="example-examples"></div>
+        </section>
 
-        <div id="resultContent" class="hidden">
-          <div class="result-summary-card">
-            <div class="result-summary-top">
-              <div>
-                <div class="result-label">Краткий вывод</div>
-                <div id="shortAnswer" class="result-short-answer"></div>
+        <section class="panel panel-results">
+          <div class="panel-header">
+            <h2>Результат</h2>
+            <span id="resultMeta" class="muted"></span>
+          </div>
+
+          <div id="resultEmpty" class="empty-state">
+            Пока нет результата. Запусти запрос выше.
+          </div>
+
+          <div id="resultContent" class="hidden">
+            <div class="result-summary-card">
+              <div class="result-summary-top">
+                <div>
+                  <div class="result-label">Краткий вывод</div>
+                  <div id="shortAnswer" class="result-short-answer"></div>
+                </div>
+                <div class="result-badges">
+                  <span id="confidenceBadge" class="badge"></span>
+                  <span id="llmBadge" class="badge"></span>
+                </div>
               </div>
-              <div class="result-badges">
-                <span id="confidenceBadge" class="badge"></span>
-                <span id="llmBadge" class="badge"></span>
+            </div>
+
+            <div class="result-sections-grid">
+              <div class="subpanel">
+                <div class="subpanel-title">Основание</div>
+                <ul id="evidenceList" class="list"></ul>
+              </div>
+
+              <div class="subpanel">
+                <div class="subpanel-title">Ограничения</div>
+                <ul id="limitationsList" class="list"></ul>
+              </div>
+
+              <div class="subpanel">
+                <div class="subpanel-title">Применённые фильтры</div>
+                <ul id="filtersList" class="list"></ul>
+              </div>
+
+              <div class="subpanel">
+                <div class="subpanel-title">Использованные задачи</div>
+                <ul id="usedIdsList" class="list"></ul>
               </div>
             </div>
-          </div>
 
-          <div class="result-sections-grid">
-            <div class="subpanel">
-              <div class="subpanel-title">Основание</div>
-              <ul id="evidenceList" class="list"></ul>
+            <div id="itemsBlock" class="subpanel hidden">
+              <div class="subpanel-title">Детали результата</div>
+              <div id="itemsContainer"></div>
             </div>
 
-            <div class="subpanel">
-              <div class="subpanel-title">Ограничения</div>
-              <ul id="limitationsList" class="list"></ul>
-            </div>
-
-            <div class="subpanel">
-              <div class="subpanel-title">Применённые фильтры</div>
-              <ul id="filtersList" class="list"></ul>
-            </div>
-
-            <div class="subpanel">
-              <div class="subpanel-title">Использованные задачи</div>
-              <ul id="usedIdsList" class="list"></ul>
+            <div id="tasksBlock" class="subpanel hidden">
+              <div class="subpanel-title">Найденные задачи</div>
+              <div id="tasksContainer" class="task-cards"></div>
             </div>
           </div>
+        </section>
 
-          <div id="itemsBlock" class="subpanel hidden">
-            <div class="subpanel-title">Детали результата</div>
-            <div id="itemsContainer"></div>
+        <section class="panel panel-admin-wrap">
+          <button id="adminToggleBtn" class="admin-toggle-btn" type="button">
+            Сервисные действия ▾
+          </button>
+
+          <div id="adminSection" class="admin-section hidden">
+            <div class="admin-status-row">
+              <h3>Состояние системы</h3>
+              <div id="statusBadges" class="status-badges"></div>
+              <span id="statusUpdatedAt" class="muted"></span>
+            </div>
+
+            <div class="admin-actions">
+              <button id="prepareBtn" class="btn btn-secondary" type="button">
+                Подготовить данные
+              </button>
+              <button id="rebuildBtn" class="btn btn-secondary" type="button">
+                Пересобрать индекс
+              </button>
+              <button id="refreshBootstrapBtn" class="btn btn-secondary" type="button">
+                Обновить UI
+              </button>
+            </div>
+
+            <div id="adminLog" class="admin-log"></div>
           </div>
-
-          <div id="tasksBlock" class="subpanel hidden">
-            <div class="subpanel-title">Найденные задачи</div>
-            <div id="tasksContainer" class="task-cards"></div>
-          </div>
-        </div>
-      </section>
-
-      <section class="panel panel-history">
-        <div class="panel-header">
-          <h2>Последние запросы</h2>
-          <div class="panel-header-actions">
-            <button id="refreshHistoryBtn" class="btn btn-secondary btn-sm" type="button">
-              Обновить
-            </button>
-            <button id="historyToggleBtn" class="btn btn-secondary btn-sm" type="button">
-              Развернуть ▾
-            </button>
-          </div>
-        </div>
-        <div id="historyContainer" class="history-list hidden"></div>
-      </section>
-
-      <section class="panel panel-admin-wrap">
-        <button id="adminToggleBtn" class="admin-toggle-btn" type="button">
-          Сервисные действия ▾
-        </button>
-
-        <div id="adminSection" class="admin-section hidden">
-          <div class="admin-status-row">
-            <h3>Состояние системы</h3>
-            <div id="statusBadges" class="status-badges"></div>
-            <span id="statusUpdatedAt" class="muted"></span>
-          </div>
-
-          <div class="admin-actions">
-            <button id="prepareBtn" class="btn btn-secondary" type="button">
-              Подготовить данные
-            </button>
-            <button id="rebuildBtn" class="btn btn-secondary" type="button">
-              Пересобрать индекс
-            </button>
-            <button id="refreshBootstrapBtn" class="btn btn-secondary" type="button">
-              Обновить UI
-            </button>
-          </div>
-
-          <div id="adminLog" class="admin-log"></div>
-        </div>
-      </section>
-    </main>
+        </section>
+      </main>
+    </div>
   </div>
 
-  <script src="/static/app.js?v=2" defer></script>
+  <script src="/static/app.js?v=4" defer></script>
 </body>
 </html>

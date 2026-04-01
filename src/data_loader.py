@@ -63,7 +63,25 @@ def load_csv(path: Path) -> pd.DataFrame:
     encoding='utf-8-sig' убирает BOM.
     После этого дополнительно чистим названия колонок.
     """
-    df = pd.read_csv(path, sep=None, engine="python", encoding="utf-8-sig")
+    # Stage 1: keep text decoding lightweight and deterministic.
+    # We try UTF-8 first (default path), then CP1251 for legacy CSV exports.
+    csv_encodings = ("utf-8-sig", "utf-8", "cp1251")
+    last_error = None
+    df = None
+
+    for encoding in csv_encodings:
+        try:
+            df = pd.read_csv(path, sep=None, engine="python", encoding=encoding)
+            break
+        except UnicodeDecodeError as exc:
+            last_error = exc
+
+    if df is None:
+        raise ValueError(
+            f"Не удалось прочитать CSV {path.name} в кодировках {csv_encodings}. "
+            f"Последняя ошибка: {last_error}"
+        )
+
     df = normalize_dataframe_columns(df)
     validate_required_columns(df, path)
     return attach_source_metadata(df, path, "csv")

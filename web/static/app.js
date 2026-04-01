@@ -5,12 +5,33 @@ const state = {
   streamBuffer: "",
   suggestionTimer: null,
   selectedExampleCategoryId: null,
-  historyCollapsed: true,
   selectedMode: "ai_answer",
+  activeChatId: "",
+  sidebarCollapsed: false,
 };
 
-// els is populated inside init() after DOMContentLoaded to guarantee DOM availability
 const els = {};
+
+const FILTER_LABELS_RU = {
+  issue_id: "ID задачи",
+  status: "статус",
+  status_group: "группа статуса",
+  workflow_group: "группа процесса",
+  functional_customer: "заказчик",
+  responsible_dit: "ответственный",
+  current_approval_stage: "текущая стадия согласования",
+  doc_type: "тип документа",
+  pending_approvals: "ожидаемые согласования",
+  priority: "приоритет",
+};
+
+function normalizeFilterLabel(value) {
+  let text = String(value ?? "");
+  for (const [raw, label] of Object.entries(FILTER_LABELS_RU)) {
+    text = text.replaceAll(raw, label);
+  }
+  return text;
+}
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -88,9 +109,7 @@ function showAdminLog(message, type = "info") {
 async function apiGet(url) {
   const res = await fetch(url, {
     method: "GET",
-    headers: {
-      "Accept": "application/json",
-    },
+    headers: { "Accept": "application/json" },
   });
 
   const data = await res.json();
@@ -117,48 +136,254 @@ async function apiPost(url, body) {
   return data.data;
 }
 
+async function apiDelete(url) {
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: { "Accept": "application/json" },
+  });
+
+  const data = await res.json();
+  if (!res.ok || data.ok === false) {
+    throw new Error(data.message || `Ошибка DELETE ${url}`);
+  }
+  return data.data;
+}
+
+// ── Sidebar / Chat sessions ─────────────────────────────────────
+
+function toggleSidebar() {
+  state.sidebarCollapsed = !state.sidebarCollapsed;
+  els.sidebar.classList.toggle("sidebar--collapsed", state.sidebarCollapsed);
+  els.sidebar.classList.remove("sidebar--mobile-open");
+}
+
+async function loadChatList() {
+  try {
+    const chats = await apiGet("/api/chats?limit=50");
+    renderChatList(chats);
+  } catch (_) {
+    renderChatList([]);
+  }
+}
+
+function renderChatList(chats) {
+  if (!Array.isArray(chats) || chats.length === 0) {
+    els.chatList.innerHTML = `<div class="chat-list-empty">Нет чатов</div>`;
+    return;
+  }
+
+  els.chatList.innerHTML = chats.map(chat => {
+    const isActive = chat.id === state.activeChatId;
+    const title = chat.title || "Без названия";
+    const time = chat.updated_at || "";
+    return `
+      <div class="chat-item ${isActive ? "active" : ""}" data-chat-id="${escapeHtml(chat.id)}">
+        <button type="button" class="chat-item-open" data-chat-id="${escapeHtml(chat.id)}">
+          <div class="chat-item-body">
+            <div class="chat-item-title">${escapeHtml(title)}</div>
+            <div class="chat-item-time">${escapeHtml(time)}</div>
+          </div>
+        </button>
+        <button
+          type="button"
+          class="chat-item-delete"
+          data-delete-chat-id="${escapeHtml(chat.id)}"
+          data-chat-title="${escapeHtml(title)}"
+          title="Удалить чат"
+          aria-label="Удалить чат"
+        >✕</button>
+      </div>
+    `;
+  }).join("");
+}
+
+async function createNewChat() {
+  state.activeChatId = "";
+  els.queryInput.value = "";
+  renderResult(null);
+  renderChatThread([]);
+  highlightActiveChat();
+  els.queryInput.focus();
+}
+
+async function openChat(chatId) {
+  state.activeChatId = chatId;
+  highlightActiveChat();
+
+  try {
+    const messages = await apiGet(`/api/chats/${chatId}/messages`);
+    renderChatThread(messages);
+    renderResult(getLatestResultFromMessages(messages));
+  } catch (err) {
+    renderChatThread([]);
+    renderResult(null);
+  }
+}
+
+async function deleteChat(chatId, chatTitle = "") {
+  const label = chatTitle ? `чат "${chatTitle}"` : "этот чат";
+  const confirmed = window.confirm(`Удалить ${label}?`);
+  if (!confirmed) return;
+
+  try {
+    await apiDelete(`/api/chats/${chatId}`);
+  } catch (_) {}
+
+  if (state.activeChatId === chatId) {
+    state.activeChatId = "";
+    renderResult(null);
+    renderChatThread([]);
+  }
+  await loadChatList();
+}
+
+function highlightActiveChat() {
+  const items = els.chatList.querySelectorAll(".chat-item");
+  items.forEach(item => {
+    item.classList.toggle("active", item.dataset.chatId === state.activeChatId);
+  });
+}
+
+async function ensureActiveChatSession(query) {
+  if (state.activeChatId) return state.activeChatId;
+
+  const title = query.length > 60 ? query.substring(0, 60) + "…" : query;
+  const chat = await apiPost("/api/chats", { title });
+  state.activeChatId = chat.id;
+  await loadChatList();
+  return chat.id;
+}
+
+// -- Chat thread rendering -----------------------------------------------
+
+function parseStoredResult(answerRaw) {
+  const raw = String(answerRaw || "").trim();
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch (_) {}
+
+  return {
+    mode: "",
+    short_answer: raw,
+    confidence: "",
+    used_llm: null,
+    duration_ms: 0,
+    evidence: [],
+    limitations: [],
+    applied_filters: [],
+    used_issue_ids: [],
+    items: [],
+    tasks: [],
+  };
+}
+
+function getLatestResultFromMessages(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) return null;
+
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const parsed = parseStoredResult(messages[i]?.answer_text || "");
+    if (parsed) return parsed;
+  }
+
+  return null;
+}
+
+function compactTextList(values) {
+  if (!Array.isArray(values)) return [];
+  return values
+    .map(value => String(value || "").trim())
+    .filter(Boolean);
+}
+
+function buildThreadAnswerPreview(answerRaw) {
+  const parsed = parseStoredResult(answerRaw);
+  if (!parsed) return "";
+
+  const lines = [];
+  const shortAnswer = String(parsed.short_answer || "").trim();
+  const evidence = compactTextList(parsed.evidence).slice(0, 3);
+  const limitations = compactTextList(parsed.limitations).slice(0, 2);
+  const usedIds = compactTextList(parsed.used_issue_ids).slice(0, 8);
+
+  if (shortAnswer) {
+    lines.push(shortAnswer);
+  }
+
+  if (evidence.length) {
+    lines.push("", "Основание:");
+    evidence.forEach(item => lines.push(`- ${item}`));
+  }
+
+  if (limitations.length) {
+    lines.push("", "Ограничения:");
+    limitations.forEach(item => lines.push(`- ${item}`));
+  }
+
+  if (usedIds.length) {
+    lines.push("", `Задачи: ${usedIds.join(", ")}`);
+  }
+
+  return lines.join("\n").trim();
+}
+
+function renderChatThread(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    els.chatThread.classList.add("hidden");
+    els.chatThread.innerHTML = "";
+    return;
+  }
+
+  els.chatThread.classList.remove("hidden");
+
+  els.chatThread.innerHTML = messages.map(msg => {
+    const queryText = msg.query_text || "";
+    const answerRaw = msg.answer_text || "";
+    const time = msg.created_at || "";
+    const mode = msg.query_mode || "";
+    const answerPreview = buildThreadAnswerPreview(answerRaw) || String(answerRaw || "");
+
+    return `
+      <div class="chat-msg chat-msg--user">
+        <div class="chat-msg-header">
+          <span class="chat-msg-role">Вы</span>
+          <span class="chat-msg-time">${escapeHtml(time)}</span>
+        </div>
+        <div class="chat-msg-text">${escapeHtml(queryText)}</div>
+      </div>
+      <div class="chat-msg chat-msg--agent">
+        <div class="chat-msg-header">
+          <span class="chat-msg-role">Агент · ${escapeHtml(friendlyModeName(mode))}</span>
+          <span class="chat-msg-time">${escapeHtml(time)}</span>
+        </div>
+        <div class="chat-msg-text">${escapeHtml(answerPreview)}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+// -- Status / Bootstrap --------------------------------------------------
 function renderStatus(payload) {
   const status = payload?.status || payload || {};
   const html = [
-    `
-      <span class="${badgeClassByBoolean(status.prepared_data)}">
-        Данные: ${status.prepared_data ? "OK" : "Нет"}
-      </span>
-    `,
-    `
-      <span class="${badgeClassByBoolean(status.index_ready)}">
-        Индекс: ${status.index_ready ? "OK" : "Нет"}
-      </span>
-    `,
-    `
-      <span class="${badgeClassByBoolean(status.ollama_ready)}">
-        Ollama: ${status.ollama_ready ? "OK" : "Нет"}
-      </span>
-    `,
-    `
-      <span class="badge badge-neutral">Всего задач: ${Number(status.tasks_total || 0)}</span>
-    `,
-    `
-      <span class="badge badge-neutral">Активных: ${Number(status.active_total || 0)}</span>
-    `,
-    `
-      <span class="badge badge-neutral">Финальных: ${Number(status.final_total || 0)}</span>
-    `,
-    `
-      <span class="badge badge-warning">Просрочено: ${Number(status.overdue_total || 0)}</span>
-    `,
-    `
-      <span class="badge badge-info">С замечаниями: ${Number(status.with_remarks_total || 0)}</span>
-    `,
-    `
-      <span class="badge badge-info">Pending approvals: ${Number(status.pending_approvals_total || 0)}</span>
-    `,
+    `<span class="${badgeClassByBoolean(status.prepared_data)}">Данные: ${status.prepared_data ? "OK" : "Нет"}</span>`,
+    `<span class="${badgeClassByBoolean(status.index_ready)}">Индекс: ${status.index_ready ? "OK" : "Нет"}</span>`,
+    `<span class="${badgeClassByBoolean(status.ollama_ready)}">Ollama: ${status.ollama_ready ? "OK" : "Нет"}</span>`,
+    `<span class="badge badge-neutral">Всего задач: ${Number(status.tasks_total || 0)}</span>`,
+    `<span class="badge badge-neutral">Активных: ${Number(status.active_total || 0)}</span>`,
+    `<span class="badge badge-neutral">Финальных: ${Number(status.final_total || 0)}</span>`,
+    `<span class="badge badge-warning">Просрочено: ${Number(status.overdue_total || 0)}</span>`,
+    `<span class="badge badge-info">С замечаниями: ${Number(status.with_remarks_total || 0)}</span>`,
+    `<span class="badge badge-info">Ожид. согласований: ${Number(status.pending_approvals_total || 0)}</span>`,
   ].join("");
 
   els.statusBadges.innerHTML = html;
   els.statusUpdatedAt.textContent = `Обновлено: ${formatNow()}`;
 }
-
 
 function renderExampleCategories(categories) {
   if (!Array.isArray(categories)) {
@@ -271,7 +496,7 @@ function renderTaskCards(tasks) {
             <span>${escapeHtml(stage || "—")}</span>
           </div>
           <div class="task-meta-item">
-            <span class="task-meta-label">Pending approvals</span>
+            <span class="task-meta-label">Ожидаемые согласования</span>
             <span>${escapeHtml(pendingApprovals || "—")}</span>
           </div>
           <div class="task-meta-item full">
@@ -392,47 +617,17 @@ function renderResult(result) {
 
   renderSimpleList(els.evidenceList, result.evidence, "Нет фактов");
   renderSimpleList(els.limitationsList, result.limitations, "Нет ограничений");
-  renderSimpleList(els.filtersList, result.applied_filters, "Нет фильтров");
+  const appliedFilters = Array.isArray(result.applied_filters)
+    ? result.applied_filters.map(normalizeFilterLabel)
+    : [];
+  renderSimpleList(els.filtersList, appliedFilters, "Нет фильтров");
   renderSimpleList(els.usedIdsList, result.used_issue_ids, "Нет использованных ID");
 
   renderItems(result);
   renderTaskCards(getTasksFromResult(result));
 }
 
-function renderHistory(rows) {
-  if (!Array.isArray(rows) || rows.length === 0) {
-    els.historyContainer.innerHTML = `<div class="muted">История пока пустая</div>`;
-    return;
-  }
-
-  els.historyContainer.innerHTML = rows.map(row => {
-    const query = row.query_text || row.query || "";
-    const mode = row.query_mode || row.mode || "";
-    const duration = row.duration_ms || 0;
-    const answer = row.answer_text || "";
-    let shortAnswer = answer;
-
-    try {
-      const parsed = JSON.parse(answer);
-      shortAnswer = parsed.short_answer || answer;
-    } catch (_) {}
-
-    return `
-      <button
-        type="button"
-        class="history-item"
-        data-history-query="${escapeHtml(query)}"
-      >
-        <div class="history-query">${escapeHtml(query)}</div>
-        <div class="history-meta">
-          <span>${escapeHtml(mode || "—")}</span>
-          <span>${Number(duration || 0)} мс</span>
-        </div>
-        <div class="history-answer">${escapeHtml(shortAnswer)}</div>
-      </button>
-    `;
-  }).join("");
-}
+// ── Bootstrap ───────────────────────────────────────────────────
 
 async function loadBootstrap() {
   const data = await apiGet("/api/ui-bootstrap");
@@ -446,10 +641,7 @@ async function loadBootstrap() {
   }
 }
 
-async function loadHistory() {
-  const rows = await apiGet("/api/history?limit=12");
-  renderHistory(rows);
-}
+// ── Suggestions ─────────────────────────────────────────────────
 
 function openSuggestions() {
   els.suggestionsBox.classList.remove("hidden");
@@ -498,6 +690,8 @@ function scheduleSuggestions() {
     }
   }, 220);
 }
+
+// ── Query execution ─────────────────────────────────────────────
 
 function showProgress(text = "Обработка запроса…") {
   state.streamBuffer = "";
@@ -561,6 +755,13 @@ async function runQueryStream() {
     state.abortController.abort();
   }
 
+  let chatId;
+  try {
+    chatId = await ensureActiveChatSession(query);
+  } catch (err) {
+    chatId = "";
+  }
+
   state.abortController = new AbortController();
   state.lastResult = null;
   setQueryRunning(true);
@@ -574,7 +775,7 @@ async function runQueryStream() {
         "Content-Type": "application/json",
         "Accept": "text/event-stream",
       },
-      body: JSON.stringify({ query, mode }),
+      body: JSON.stringify({ query, mode, chat_id: chatId }),
       signal: state.abortController.signal,
     });
 
@@ -610,7 +811,7 @@ async function runQueryStream() {
     }
 
     if (!state.lastResult) {
-      const data = await apiPost("/api/query", { query, mode });
+      const data = await apiPost("/api/query", { query, mode, chat_id: chatId });
       hideProgress();
       renderResult(data);
     }
@@ -622,7 +823,7 @@ async function runQueryStream() {
     }
 
     try {
-      const data = await apiPost("/api/query", { query, mode });
+      const data = await apiPost("/api/query", { query, mode, chat_id: chatId });
       renderResult(data);
     } catch (fallbackError) {
       alert(`Ошибка запроса: ${fallbackError.message || error.message}`);
@@ -631,9 +832,7 @@ async function runQueryStream() {
     setQueryRunning(false);
     state.abortController = null;
 
-    try {
-      await loadHistory();
-    } catch (_) {}
+    try { await loadChatList(); } catch (_) {}
   }
 }
 
@@ -656,9 +855,7 @@ async function exportCurrentResult() {
     setButtonLoading(els.exportBtn, true, "Экспорт...");
     const response = await fetch("/api/export-results", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query, mode }),
     });
 
@@ -686,13 +883,14 @@ async function exportCurrentResult() {
   }
 }
 
+// ── Admin actions ───────────────────────────────────────────────
+
 async function runPrepare() {
   try {
     setButtonLoading(els.prepareBtn, true, "Подготовка...");
     const data = await apiPost("/api/prepare", {});
     showAdminLog(`Подготовка данных завершена. Всего задач: ${Number(data.tasks_total || 0)}`);
     await loadBootstrap();
-    await loadHistory();
   } catch (error) {
     showAdminLog(error.message || "Ошибка подготовки данных", "error");
   } finally {
@@ -713,19 +911,13 @@ async function runRebuild() {
   }
 }
 
-function toggleHistory() {
-  state.historyCollapsed = !state.historyCollapsed;
-  els.historyContainer.classList.toggle("hidden", state.historyCollapsed);
-  els.historyToggleBtn.textContent = state.historyCollapsed
-    ? "Развернуть ▾"
-    : "Свернуть ▴";
-}
-
 function setMode(mode) {
   state.selectedMode = mode;
   els.modeAiBtn.classList.toggle("active", mode === "ai_answer");
   els.modePreciseBtn.classList.toggle("active", mode === "precise");
 }
+
+// ── Events ──────────────────────────────────────────────────────
 
 function bindEvents() {
   try {
@@ -755,8 +947,9 @@ function bindEvents() {
 
   els.prepareBtn.addEventListener("click", runPrepare);
   els.rebuildBtn.addEventListener("click", runRebuild);
-  els.refreshHistoryBtn.addEventListener("click", loadHistory);
-  els.historyToggleBtn.addEventListener("click", toggleHistory);
+
+  els.sidebarToggleBtn.addEventListener("click", toggleSidebar);
+  els.newChatBtn.addEventListener("click", createNewChat);
 
   els.queryInput.addEventListener("input", scheduleSuggestions);
 
@@ -772,6 +965,24 @@ function bindEvents() {
 
   document.addEventListener("click", (event) => {
     const target = event.target;
+
+    if (target.closest(".chat-item-delete")) {
+      const btn = target.closest(".chat-item-delete");
+      const chatId = btn.dataset.deleteChatId;
+      const chatTitle = btn.dataset.chatTitle || "";
+      if (chatId) {
+        event.stopPropagation();
+        deleteChat(chatId, chatTitle);
+      }
+      return;
+    }
+
+    if (target.closest(".chat-item-open")) {
+      const item = target.closest(".chat-item-open");
+      const chatId = item.dataset.chatId;
+      if (chatId) openChat(chatId);
+      return;
+    }
 
     if (target.closest(".suggestion-item")) {
       const button = target.closest(".suggestion-item");
@@ -802,14 +1013,6 @@ function bindEvents() {
       return;
     }
 
-    if (target.closest(".history-item")) {
-      const button = target.closest(".history-item");
-      const query = button.dataset.historyQuery || "";
-      els.queryInput.value = query;
-      els.queryInput.focus();
-      return;
-    }
-
     if (
       !target.closest(".query-input-wrap") &&
       !target.closest(".suggestions")
@@ -822,8 +1025,9 @@ function bindEvents() {
   }
 }
 
+// ── Init ────────────────────────────────────────────────────────
+
 async function init() {
-  // Populate els after DOM is ready
   els.refreshBootstrapBtn = document.getElementById("refreshBootstrapBtn");
   els.statusUpdatedAt = document.getElementById("statusUpdatedAt");
   els.statusBadges = document.getElementById("statusBadges");
@@ -861,15 +1065,17 @@ async function init() {
   els.tasksBlock = document.getElementById("tasksBlock");
   els.tasksContainer = document.getElementById("tasksContainer");
 
-  els.historyContainer = document.getElementById("historyContainer");
-  els.refreshHistoryBtn = document.getElementById("refreshHistoryBtn");
-  els.historyToggleBtn = document.getElementById("historyToggleBtn");
-
   els.adminToggleBtn = document.getElementById("adminToggleBtn");
   els.adminSection = document.getElementById("adminSection");
   els.prepareBtn = document.getElementById("prepareBtn");
   els.rebuildBtn = document.getElementById("rebuildBtn");
   els.adminLog = document.getElementById("adminLog");
+
+  els.sidebar = document.getElementById("sidebar");
+  els.sidebarToggleBtn = document.getElementById("sidebarToggleBtn");
+  els.newChatBtn = document.getElementById("newChatBtn");
+  els.chatList = document.getElementById("chatList");
+  els.chatThread = document.getElementById("chatThread");
 
   bindEvents();
   renderResult(null);
@@ -885,10 +1091,9 @@ async function init() {
   }
 
   try {
-    await loadHistory();
-  } catch (error) {
-    showAdminLog(error.message || "Ошибка загрузки истории", "error");
-  }
+    await loadChatList();
+  } catch (_) {}
 }
 
 window.addEventListener("DOMContentLoaded", init);
+

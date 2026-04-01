@@ -6,12 +6,17 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from web.schemas import ExportRequest, QueryRequest
+from src.history_store import init_history_db
+from web.schemas import CreateChatRequest, ExportRequest, QueryRequest
 from web.service import (
+    create_chat_action,
+    delete_chat_action,
     export_results_action,
+    get_chat_messages_action,
     get_history_action,
     get_system_status,
     get_ui_bootstrap_action,
+    list_chats_action,
     prepare_data_action,
     rebuild_index_action,
     run_agent_web,
@@ -22,6 +27,11 @@ from web.service import (
 BASE_DIR = Path(__file__).resolve().parent
 
 app = FastAPI(title="YouTrack Agent Web UI")
+
+
+@app.on_event("startup")
+def on_startup():
+    init_history_db()
 
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -164,7 +174,7 @@ def api_query_stream(payload: QueryRequest):
     Для остальных режимов — сразу отдаёт готовый result.
     """
     def event_generator():
-        yield from stream_agent_service(payload.query, payload.mode)
+        yield from stream_agent_service(payload.query, payload.mode, chat_id=payload.chat_id)
 
     return StreamingResponse(
         event_generator(),
@@ -219,3 +229,43 @@ def api_history(limit: int = 20):
             "message": f"Ошибка чтения истории: {e}",
             "data": None,
         }
+
+
+# ── Chat session endpoints ───────────────────────────────────────
+
+@app.post("/api/chats")
+def api_create_chat(payload: CreateChatRequest):
+    try:
+        data = create_chat_action(title=payload.title)
+        return {"ok": True, "message": "Чат создан", "data": data}
+    except Exception as e:
+        return {"ok": False, "message": f"Ошибка создания чата: {e}", "data": None}
+
+
+@app.get("/api/chats")
+def api_list_chats(limit: int = Query(default=50, ge=1, le=200)):
+    try:
+        data = list_chats_action(limit=limit)
+        return {"ok": True, "message": "Список чатов", "data": data}
+    except Exception as e:
+        return {"ok": False, "message": f"Ошибка получения чатов: {e}", "data": None}
+
+
+@app.get("/api/chats/{chat_id}/messages")
+def api_chat_messages(chat_id: str):
+    try:
+        data = get_chat_messages_action(chat_id)
+        return {"ok": True, "message": "Сообщения чата", "data": data}
+    except Exception as e:
+        return {"ok": False, "message": f"Ошибка получения сообщений: {e}", "data": None}
+
+
+@app.delete("/api/chats/{chat_id}")
+def api_delete_chat(chat_id: str):
+    try:
+        deleted = delete_chat_action(chat_id)
+        if not deleted:
+            return {"ok": False, "message": "Чат не найден", "data": None}
+        return {"ok": True, "message": "Чат удалён", "data": {"id": chat_id}}
+    except Exception as e:
+        return {"ok": False, "message": f"Ошибка удаления чата: {e}", "data": None}
