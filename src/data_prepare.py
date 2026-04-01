@@ -3,6 +3,10 @@ from datetime import datetime
 
 from src.config import DATASET_REPORT_JSON, TASKS_JSON
 from src.data_loader import load_source_dataframe
+from src.dataset_lifecycle import (
+    prepare_dataset_replacement_if_needed,
+    register_prepared_dataset,
+)
 from src.schema import (
     APPROVAL_LABELS,
     APPROVAL_TARGET_FIELDS,
@@ -537,11 +541,17 @@ def build_dataset_report(tasks: list[dict], files: dict, stats: dict, dedupe_sta
 
 
 def save_prepared_tasks():
+    replacement_info = prepare_dataset_replacement_if_needed()
+
     tasks, files, stats, dedupe_stats = build_tasks_dataset()
     report = build_dataset_report(tasks, files, stats, dedupe_stats)
 
     save_json(tasks, TASKS_JSON)
     save_json(report, DATASET_REPORT_JSON)
+    active_dataset = register_prepared_dataset(
+        rows_raw_total=report["rows_raw_total"],
+        tasks_total=len(tasks),
+    )
 
     xlsx_names = ", ".join(path.name for path in files.get("xlsx", [])) or "нет"
     csv_names = ", ".join(path.name for path in files.get("csv", [])) or "нет"
@@ -566,6 +576,20 @@ def save_prepared_tasks():
         f"Топ текущих стадий согласования: {report['top_current_approval_stages'][:5]}",
         f"Неизвестные статусы: {report['unknown_statuses'][:10]}",
     ]
+
+    report_lines.append(f"Active dataset_id: {active_dataset['dataset_id']}")
+
+    if replacement_info.get("dataset_replaced"):
+        report_lines.append("Замена датасета: да")
+
+    if replacement_info.get("raw_removed"):
+        report_lines.append(f"Очищены остатки old raw: {replacement_info['raw_removed']}")
+
+    if replacement_info.get("processed_removed") or replacement_info.get("index_removed"):
+        report_lines.append(
+            "Очищены old processed/index: "
+            f"{replacement_info.get('processed_removed', [])} / {replacement_info.get('index_removed', [])}"
+        )
 
     return tasks, report_lines
 

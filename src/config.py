@@ -11,6 +11,7 @@ RAW_DIR = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"
 INDEX_DIR = DATA_DIR / "index"
 HISTORY_DIR = DATA_DIR / "history"
+ACTIVE_DATASET_JSON = DATA_DIR / "active_dataset.json"
 
 TASKS_JSON = PROCESSED_DIR / "tasks.json"
 DATASET_REPORT_JSON = PROCESSED_DIR / "dataset_report.json"

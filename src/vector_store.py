@@ -8,6 +8,7 @@ except Exception:
 import numpy as np
 
 from src.config import TASKS_JSON, FAISS_INDEX_FILE, FAISS_MAPPING_FILE
+from src.dataset_lifecycle import mark_active_dataset_indexed
 from src.utils import load_json, save_json, ensure_dir
 from src.ollama_client import ollama_client
 
@@ -161,6 +162,7 @@ def rebuild_index():
     index.add(np_vectors)
 
     save_index(index, mapping)
+    mark_active_dataset_indexed(tasks_total=len(tasks))
 
     report = {
         "tasks_total": total_tasks,

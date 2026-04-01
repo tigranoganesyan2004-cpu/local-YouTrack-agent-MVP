@@ -1,0 +1,22 @@
+{
+  "dataset_id": "ds_e24b5a54d992920b",
+  "source_files": [
+    "raw/Задачи (1) (2).csv",
+    "raw/Задачи (1).xlsx"
+  ],
+  "source_hashes": [
+    {
+      "path": "raw/Задачи (1) (2).csv",
+      "sha256": "b3bcb11f2aead6dc4e7add84660ff26756fbda803242fe38c3d13e2661508206"
+    },
+    {
+      "path": "raw/Задачи (1).xlsx",
+      "sha256": "b43833e344435017110c882905f311412f8048b5b6ba24b4b7735df260dd8a37"
+    }
+  ],
+  "created_at": "2026-04-01T11:58:39",
+  "prepared_at": "2026-04-01T11:59:45",
+  "indexed_at": "2026-04-01T12:03:59",
+  "rows_raw_total": 592,
+  "tasks_total": 296
+}

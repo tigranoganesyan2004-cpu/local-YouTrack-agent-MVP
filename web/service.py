@@ -11,6 +11,7 @@ from src.agent import run_agent
 from src.answer_builder import fallback_result, llm_result
 from src.config import DATASET_REPORT_JSON, OLLAMA_HOST, TASKS_JSON
 from src.data_prepare import has_prepared_tasks, save_prepared_tasks
+from src.dataset_lifecycle import load_active_dataset_metadata
 from src.history_store import get_last_history, save_history
 from src.ollama_client import ollama_client
 from src.prompts import build_llm_prompt
@@ -337,6 +338,7 @@ def _build_dashboard(tasks: list[dict], report: dict) -> dict:
 
 def _build_status_payload(tasks: list[dict], report: dict) -> dict:
     kpis = dataset_kpis(tasks)
+    active_dataset = load_active_dataset_metadata()
 
     payload = {
         # backward-compatible поля
@@ -351,6 +353,9 @@ def _build_status_payload(tasks: list[dict], report: dict) -> dict:
         "with_remarks_total": kpis.get("with_remarks", 0),
         "pending_approvals_total": kpis.get("pending_approvals", 0),
         "source_files": report.get("source_files", {}),
+        "active_dataset_id": safe_str(active_dataset.get("dataset_id")),
+        "dataset_prepared_at": safe_str(active_dataset.get("prepared_at")),
+        "dataset_indexed_at": safe_str(active_dataset.get("indexed_at")),
     }
 
     return payload
