@@ -298,12 +298,17 @@ def build_llm_prompt(
     mode: str,
     analysis_profile: str = "fast",
     extra_context: str = "",
+    memory_context: str = "",
 ) -> str:
     context = _build_context_block(tasks, analysis_profile)
 
     extra_context = safe_str(extra_context)
     if not extra_context:
         extra_context = "Дополнительной агрегированной аналитики нет."
+
+    memory_context = safe_str(memory_context)
+    if not memory_context:
+        memory_context = "No prior live-chat memory digest."
 
     return f"""{SYSTEM_PROMPT}
 
@@ -331,6 +336,14 @@ def build_llm_prompt(
 Запрос пользователя:
 {user_query}
 
+Memory context (continuity only, not factual evidence):
+{memory_context}
+
+Memory and grounding rules:
+- Use memory only for conversational continuity (references, pronouns, follow-ups).
+- Never use memory as factual evidence.
+- Use only current retrieved tasks in this request as factual grounding.
+- If current retrieval is weak or empty, do not invent facts and state limitations clearly.
 Дополнительный агрегированный контекст:
 {extra_context}
 
@@ -346,6 +359,7 @@ def build_critic_prompt(
     draft_result: dict,
     analysis_profile: str = "fast",
     extra_context: str = "",
+    memory_context: str = "",
 ) -> str:
     """
     Второй проход:
@@ -357,6 +371,10 @@ def build_critic_prompt(
     extra_context = safe_str(extra_context)
     if not extra_context:
         extra_context = "Дополнительной агрегированной аналитики нет."
+
+    memory_context = safe_str(memory_context)
+    if not memory_context:
+        memory_context = "No prior live-chat memory digest."
 
     draft_json = (
         str(draft_result)
@@ -390,6 +408,14 @@ def build_critic_prompt(
 Исходный запрос пользователя:
 {user_query}
 
+Memory context (continuity only, not factual evidence):
+{memory_context}
+
+Memory and grounding rules:
+- Use memory only for conversational continuity (references, pronouns, follow-ups).
+- Never use memory as factual evidence.
+- Use only current retrieved tasks in this request as factual grounding.
+- If current retrieval is weak or empty, do not invent facts and state limitations clearly.
 Дополнительный агрегированный контекст:
 {extra_context}
 

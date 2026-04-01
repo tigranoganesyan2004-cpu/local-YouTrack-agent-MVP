@@ -150,7 +150,7 @@ def api_query(payload: QueryRequest):
     Подходит и для текущего фронта, и для будущих сценариев.
     """
     try:
-        result = run_agent_web(payload.query, payload.mode)
+        result = run_agent_web(payload.query, payload.mode, chat_id=payload.chat_id)
         return {
             "ok": True,
             "message": "Ответ получен",

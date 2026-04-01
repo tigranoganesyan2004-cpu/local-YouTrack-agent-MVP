@@ -364,6 +364,7 @@ def _run_two_pass_llm(
     analysis_profile: str,
     fallback_message: str,
     extra_context: str = "",
+    memory_context: str = "",
 ) -> dict:
     """
     2-pass pipeline:
@@ -389,6 +390,7 @@ def _run_two_pass_llm(
         mode=mode,
         analysis_profile=analysis_profile,
         extra_context=extra_context,
+        memory_context=memory_context,
     )
 
     try:
@@ -417,6 +419,7 @@ def _run_two_pass_llm(
                 draft_result=analyst_parsed,
                 analysis_profile=analysis_profile,
                 extra_context=extra_context,
+                memory_context=memory_context,
             )
             critic_raw = ollama_client.generate(critic_prompt)
             critic_parsed = parse_json_safely(critic_raw)
@@ -448,11 +451,13 @@ def _should_use_llm(mode: str, analysis_profile: str) -> bool:
     return mode in LLM_SYNTHESIS_MODES
 
 
-def run_agent(user_query: str) -> dict:
+def run_agent(user_query: str, chat_id: str = "", memory_context: str = "") -> dict:
     started = perf_counter()
     error_text = ""
     llm_used = 0
     retrieved_candidates = []
+    chat_id = safe_str(chat_id)
+    memory_context = safe_str(memory_context)
 
     cleaned_query, analysis_profile = _extract_analysis_profile(user_query)
     intent = detect_intent(cleaned_query)
@@ -486,6 +491,7 @@ def run_agent(user_query: str) -> dict:
                 query_mode=mode,
                 answer_text=json.dumps(result, ensure_ascii=False),
                 found_issue_ids="",
+                chat_id=chat_id,
                 retrieved_candidates="",
                 duration_ms=int((perf_counter() - started) * 1000),
                 llm_used=0,
@@ -538,6 +544,7 @@ def run_agent(user_query: str) -> dict:
                             f"Главная задача: {task.get('issue_id', '')}. "
                             "Сфокусируй short_answer на ней, а related tasks используй как контекст."
                         ),
+                        memory_context=memory_context,
                     )
                     result = _merge_llm_with_base(base_result, llm_response, analysis_profile)
                 else:
@@ -589,6 +596,7 @@ def run_agent(user_query: str) -> dict:
                     analysis_profile=analysis_profile,
                     fallback_message="Показаны задачи по статусу согласования.",
                     extra_context=_build_extra_context(mode, intent, tasks=tasks, items=[]),
+                    memory_context=memory_context,
                 )
                 result = _merge_llm_with_base(base_result, llm_response, analysis_profile)
             else:
@@ -634,6 +642,7 @@ def run_agent(user_query: str) -> dict:
                     analysis_profile=analysis_profile,
                     fallback_message="Показаны просроченные задачи и сроки.",
                     extra_context=_build_extra_context(mode, intent, tasks=tasks_for_llm, items=items),
+                    memory_context=memory_context,
                 )
                 result = _merge_llm_with_base(base_result, llm_response, analysis_profile)
             else:
@@ -667,6 +676,7 @@ def run_agent(user_query: str) -> dict:
                     analysis_profile=analysis_profile,
                     fallback_message="Показана статистика по найденной выборке.",
                     extra_context=_build_extra_context(mode, intent, tasks=tasks, grouped_items=grouped),
+                    memory_context=memory_context,
                 )
                 result = _merge_llm_with_base(base_result, llm_response, analysis_profile)
             else:
@@ -700,6 +710,7 @@ def run_agent(user_query: str) -> dict:
                     analysis_profile=analysis_profile,
                     fallback_message="Показаны задачи по заказчику.",
                     extra_context=_build_extra_context(mode, intent, tasks=tasks),
+                    memory_context=memory_context,
                 )
                 result = _merge_llm_with_base(base_result, llm_response, analysis_profile)
             else:
@@ -733,6 +744,7 @@ def run_agent(user_query: str) -> dict:
                     analysis_profile=analysis_profile,
                     fallback_message="Показаны задачи по ответственному.",
                     extra_context=_build_extra_context(mode, intent, tasks=tasks),
+                    memory_context=memory_context,
                 )
                 result = _merge_llm_with_base(base_result, llm_response, analysis_profile)
             else:
@@ -777,6 +789,7 @@ def run_agent(user_query: str) -> dict:
                     analysis_profile=analysis_profile,
                     fallback_message="Показаны задачи с замечаниями.",
                     extra_context=_build_extra_context(mode, intent, tasks=tasks),
+                    memory_context=memory_context,
                 )
                 result = _merge_llm_with_base(base_result, llm_response, analysis_profile)
             else:
@@ -807,6 +820,7 @@ def run_agent(user_query: str) -> dict:
                     analysis_profile=analysis_profile,
                     fallback_message="Показаны задачи по фильтрам.",
                     extra_context=_build_extra_context(mode, intent, tasks=tasks),
+                    memory_context=memory_context,
                 )
                 result = _merge_llm_with_base(base_result, llm_response, analysis_profile)
             else:
@@ -836,6 +850,7 @@ def run_agent(user_query: str) -> dict:
                     analysis_profile=analysis_profile,
                     fallback_message="Показана сводка по выборке.",
                     extra_context=_build_extra_context(mode, intent, tasks=tasks, grouped_items=items),
+                    memory_context=memory_context,
                 )
                 result = _merge_llm_with_base(base_result, llm_response, analysis_profile)
             else:
@@ -868,6 +883,7 @@ def run_agent(user_query: str) -> dict:
                     analysis_profile=analysis_profile,
                     fallback_message="Показаны ближайшие сроки.",
                     extra_context=_build_extra_context(mode, intent, tasks=tasks_for_llm, items=items),
+                    memory_context=memory_context,
                 )
                 result = _merge_llm_with_base(base_result, llm_response, analysis_profile)
             else:
@@ -898,6 +914,7 @@ def run_agent(user_query: str) -> dict:
                 analysis_profile=analysis_profile,
                 fallback_message="Показаны наиболее похожие задачи по retrieval.",
                 extra_context=_build_extra_context(mode, intent, tasks=tasks),
+                memory_context=memory_context,
             )
 
         elif mode == "analyze_new_task":
@@ -911,6 +928,7 @@ def run_agent(user_query: str) -> dict:
                 analysis_profile=analysis_profile,
                 fallback_message="Показаны ближайшие аналоги для новой формулировки.",
                 extra_context=_build_extra_context(mode, intent, tasks=tasks),
+                memory_context=memory_context,
             )
 
         else:
@@ -926,6 +944,7 @@ def run_agent(user_query: str) -> dict:
                     analysis_profile=analysis_profile,
                     fallback_message="Показаны ближайшие задачи по свободному запросу.",
                     extra_context=_build_extra_context(mode, intent, tasks=tasks),
+                    memory_context=memory_context,
                 )
             else:
                 result = task_list(
@@ -959,6 +978,7 @@ def run_agent(user_query: str) -> dict:
             query_mode=mode,
             answer_text=json.dumps(result, ensure_ascii=False),
             found_issue_ids=", ".join(result.get("used_issue_ids", [])),
+            chat_id=chat_id,
             retrieved_candidates=", ".join(retrieved_candidates),
             duration_ms=duration_ms,
             llm_used=llm_used,

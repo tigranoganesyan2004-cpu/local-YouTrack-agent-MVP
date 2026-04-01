@@ -63,14 +63,61 @@ def test_stream_service_ignores_stale_chat_id(monkeypatch, tmp_path):
 
     monkeypatch.setattr(service, "load_active_dataset_metadata", lambda: {"dataset_id": "ds_new"})
     monkeypatch.setattr(service, "detect_intent", lambda _: {"mode": "exact_search"})
+    seen_chat_ids = []
+
+    def _fake_run_agent(_, chat_id="", memory_context=""):
+        seen_chat_ids.append(chat_id)
+        return {"mode": "exact_search", "short_answer": "ok", "used_issue_ids": []}
+
     monkeypatch.setattr(
         service,
         "run_agent",
-        lambda _: {"mode": "exact_search", "short_answer": "ok", "used_issue_ids": []},
+        _fake_run_agent,
     )
 
     list(service.stream_agent_service("test stale", "ai_answer", chat_id=stale_chat["id"]))
     list(service.stream_agent_service("test live", "ai_answer", chat_id=live_chat["id"]))
 
-    assert history_store.get_chat_messages(stale_chat["id"]) == []
-    assert len(history_store.get_chat_messages(live_chat["id"])) == 1
+    assert seen_chat_ids == ["", live_chat["id"]]
+
+
+def test_run_agent_web_applies_live_chat_policy(monkeypatch, tmp_path):
+    _init_temp_history_db(monkeypatch, tmp_path)
+
+    stale_chat = history_store.create_chat_session(title="stale", dataset_id="ds_old")
+    live_chat = history_store.create_chat_session(title="live", dataset_id="ds_new")
+
+    history_store.save_history(
+        query_text="old q",
+        query_mode="general_search",
+        answer_text='{"short_answer":"old answer","used_issue_ids":[],"evidence":["old ev"]}',
+        found_issue_ids="",
+        chat_id=stale_chat["id"],
+    )
+    history_store.save_history(
+        query_text="live q",
+        query_mode="general_search",
+        answer_text='{"short_answer":"live answer","used_issue_ids":["YT-1"],"evidence":["live ev"]}',
+        found_issue_ids="YT-1",
+        chat_id=live_chat["id"],
+    )
+
+    monkeypatch.setattr(service, "load_active_dataset_metadata", lambda: {"dataset_id": "ds_new"})
+
+    seen = []
+
+    def _fake_run_agent(_, chat_id="", memory_context=""):
+        seen.append({"chat_id": chat_id, "memory_context": memory_context})
+        return {"mode": "general_search", "short_answer": "ok", "used_issue_ids": []}
+
+    monkeypatch.setattr(service, "run_agent", _fake_run_agent)
+
+    service.run_agent_web("q stale", "ai_answer", chat_id=stale_chat["id"])
+    service.run_agent_web("q live", "ai_answer", chat_id=live_chat["id"])
+
+    assert seen[0]["chat_id"] == ""
+    assert seen[0]["memory_context"] == ""
+
+    assert seen[1]["chat_id"] == live_chat["id"]
+    assert "turn=1" in seen[1]["memory_context"]
+    assert "assistant_short_answer_digest=live answer" in seen[1]["memory_context"]

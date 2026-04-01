@@ -49,6 +49,13 @@ from src.vector_store import has_ready_index, rebuild_index
 
 _STREAMING_MODES = {"similar", "analyze_new_task", "general_search"}
 
+_MEMORY_TURNS_LIMIT = 4
+_MEMORY_QUERY_CHARS = 180
+_MEMORY_SHORT_ANSWER_CHARS = 220
+_MEMORY_EVIDENCE_CHARS = 160
+_MEMORY_USED_IDS_LIMIT = 5
+_MEMORY_TOTAL_CHARS = 1600
+
 _UI_CACHE = {
     "tasks_mtime": None,
     "report_mtime": None,
@@ -70,6 +77,108 @@ def _resolve_live_chat_id(chat_id: str, active_dataset_id: str) -> str:
         return chat_id
 
     return ""
+
+
+def _truncate_memory_text(text: str, limit: int) -> str:
+    value = safe_str(text)
+    if len(value) <= limit:
+        return value
+    if limit <= 3:
+        return value[:limit]
+    return value[: limit - 3].rstrip() + "..."
+
+
+def _parse_answer_digest(answer_text: str) -> dict:
+    raw = safe_str(answer_text)
+    if not raw:
+        return {"short_answer": "", "used_issue_ids": [], "evidence": ""}
+
+    try:
+        payload = json.loads(raw)
+    except Exception:
+        return {
+            "short_answer": _truncate_memory_text(raw, _MEMORY_SHORT_ANSWER_CHARS),
+            "used_issue_ids": [],
+            "evidence": "",
+        }
+
+    if not isinstance(payload, dict):
+        return {"short_answer": "", "used_issue_ids": [], "evidence": ""}
+
+    short_answer = _truncate_memory_text(
+        safe_str(payload.get("short_answer")),
+        _MEMORY_SHORT_ANSWER_CHARS,
+    )
+
+    evidence = ""
+    raw_evidence = payload.get("evidence", [])
+    if isinstance(raw_evidence, list):
+        for item in raw_evidence:
+            evidence = safe_str(item)
+            if evidence:
+                break
+    evidence = _truncate_memory_text(evidence, _MEMORY_EVIDENCE_CHARS)
+
+    used_issue_ids = []
+    raw_used_ids = payload.get("used_issue_ids", [])
+    if isinstance(raw_used_ids, list):
+        for issue_id in raw_used_ids:
+            value = safe_str(issue_id)
+            if value:
+                used_issue_ids.append(value)
+            if len(used_issue_ids) >= _MEMORY_USED_IDS_LIMIT:
+                break
+
+    return {
+        "short_answer": short_answer,
+        "used_issue_ids": used_issue_ids,
+        "evidence": evidence,
+    }
+
+
+def _build_chat_memory_digest(chat_id: str, web_mode: str) -> str:
+    if web_mode not in {"ai_answer", "llm"}:
+        return ""
+
+    chat_id = safe_str(chat_id)
+    if not chat_id:
+        return ""
+
+    rows = get_chat_messages(chat_id)
+    if not rows:
+        return ""
+
+    lines = [
+        "Контекст прошлых ходов (только для связности диалога, не источник фактов):",
+    ]
+
+    for idx, row in enumerate(rows[-_MEMORY_TURNS_LIMIT:], start=1):
+        mode = safe_str(row.get("query_mode"))
+        query_digest = _truncate_memory_text(
+            safe_str(row.get("query_text")),
+            _MEMORY_QUERY_CHARS,
+        )
+        answer_digest = _parse_answer_digest(safe_str(row.get("answer_text")))
+        short_answer = answer_digest["short_answer"]
+        evidence = answer_digest["evidence"]
+        used_issue_ids = ", ".join(answer_digest["used_issue_ids"])
+
+        parts = [f"turn={idx}"]
+        if mode:
+            parts.append(f"mode={mode}")
+        if query_digest:
+            parts.append(f"user_query_digest={query_digest}")
+        if short_answer:
+            parts.append(f"assistant_short_answer_digest={short_answer}")
+        if used_issue_ids:
+            parts.append(f"assistant_used_issue_ids={used_issue_ids}")
+        if evidence:
+            parts.append(f"assistant_evidence_digest={evidence}")
+
+        lines.append("- " + "; ".join(parts))
+
+    memory = "\n".join(lines).strip()
+    return _truncate_memory_text(memory, _MEMORY_TOTAL_CHARS)
 
 
 def check_ollama() -> bool:
@@ -110,9 +219,12 @@ def _route_query(query: str, web_mode: str) -> str:
     return query
 
 
-def run_agent_web(query: str, mode: str) -> dict:
+def run_agent_web(query: str, mode: str, chat_id: str = "") -> dict:
     routed_query = _route_query(query, mode)
-    return run_agent(routed_query)
+    active_dataset_id = _current_active_dataset_id()
+    live_chat_id = _resolve_live_chat_id(chat_id, active_dataset_id)
+    memory_context = _build_chat_memory_digest(live_chat_id, mode)
+    return run_agent(routed_query, chat_id=live_chat_id, memory_context=memory_context)
 
 
 def get_history_action(limit: int = 20):
@@ -742,12 +854,12 @@ def stream_agent_service(query: str, web_mode: str, chat_id: str = "") -> Genera
     intent_mode = intent["mode"]
     active_dataset_id = _current_active_dataset_id()
     live_chat_id = _resolve_live_chat_id(chat_id, active_dataset_id)
+    memory_context = _build_chat_memory_digest(live_chat_id, web_mode)
 
     if intent_mode not in _STREAMING_MODES:
-        result = run_agent(routed_query)
+        result = run_agent(routed_query, chat_id=live_chat_id, memory_context=memory_context)
         yield f"event: result\ndata: {json.dumps(result, ensure_ascii=False)}\n\n"
         yield "event: done\ndata: {}\n\n"
-        _save_stream_history(routed_query, intent_mode, result, [], started, llm_used=0, chat_id=live_chat_id)
         return
 
     search_query = intent.get("query", routed_query)
@@ -770,7 +882,12 @@ def stream_agent_service(query: str, web_mode: str, chat_id: str = "") -> Genera
         _save_stream_history(routed_query, intent_mode, result, retrieved_ids, started, llm_used=0, chat_id=live_chat_id)
         return
 
-    prompt = build_llm_prompt(routed_query, tasks, intent_mode)
+    prompt = build_llm_prompt(
+        routed_query,
+        tasks,
+        intent_mode,
+        memory_context=memory_context,
+    )
 
     full_text = ""
     try:
@@ -859,4 +976,3 @@ def get_chat_messages_action(chat_id: str) -> list[dict]:
 
 def delete_chat_action(chat_id: str) -> bool:
     return delete_chat_session(chat_id)
-
