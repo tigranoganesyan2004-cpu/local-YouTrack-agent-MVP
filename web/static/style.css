@@ -371,6 +371,25 @@ button {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.mode-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.btn-mode {
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.85rem;
+  padding: 7px 14px;
+  min-height: 36px;
+}
+
+.btn-mode.active {
+  background: rgba(79, 140, 255, 0.15);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
 .suggestions {
   position: absolute;
   top: calc(100% + 8px);

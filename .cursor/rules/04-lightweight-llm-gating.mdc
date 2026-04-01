@@ -1,0 +1,19 @@
+---
+description: Keep LLM usage narrow and lightweight in Stage 1
+alwaysApply: true
+---
+
+
+# Lightweight LLM gating
+
+In Stage 1:
+- LLM is a narrow synthesis layer
+- deterministic answers are preferred for filters, counts, deadlines, and exact task retrieval
+- do not expose deep/thinking mode in public UI
+- do not add token streaming as default UI behavior
+- do not enable reranker or critic by default
+
+When editing:
+- prefer AI Answer vs Precise Mode as the only public mode surface
+- keep LLM calls honest and minimal
+- do not add heavy chains, extra agents, or hidden complexity

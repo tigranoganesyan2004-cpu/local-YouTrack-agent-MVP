@@ -5,7 +5,8 @@ const state = {
   streamBuffer: "",
   suggestionTimer: null,
   selectedExampleCategoryId: null,
-  historyCollapsed: false,
+  historyCollapsed: true,
+  selectedMode: "ai_answer",
 };
 
 // els is populated inside init() after DOMContentLoaded to guarantee DOM availability
@@ -51,6 +52,16 @@ function statusClassFromText(status) {
 function formatNow() {
   const now = new Date();
   return now.toLocaleString("ru-RU");
+}
+
+function friendlyModeName(internalMode) {
+  const llmModes = new Set(["general_search", "similar", "analyze_new_task"]);
+  const exactModes = new Set(["exact_search"]);
+  const m = String(internalMode || "");
+  if (llmModes.has(m)) return "AI Answer";
+  if (exactModes.has(m)) return "Точный поиск";
+  if (m) return "Аналитика";
+  return "—";
 }
 
 function setButtonLoading(button, isLoading, loadingText) {
@@ -369,7 +380,7 @@ function renderResult(result) {
   els.resultContent.classList.remove("hidden");
   els.exportBtn.disabled = false;
 
-  els.resultMeta.textContent = `Режим: ${result.mode || "—"} • Время: ${Number(result.duration_ms || 0)} мс`;
+  els.resultMeta.textContent = `Режим: ${friendlyModeName(result.mode)} • Время: ${Number(result.duration_ms || 0)} мс`;
 
   els.shortAnswer.textContent = result.short_answer || "";
 
@@ -539,7 +550,7 @@ function parseSingleSseEvent(rawEvent) {
 
 async function runQueryStream() {
   const query = els.queryInput.value.trim();
-  const mode = "auto";
+  const mode = state.selectedMode;
 
   if (!query) {
     alert("Введите запрос.");
@@ -634,7 +645,7 @@ function stopQuery() {
 
 async function exportCurrentResult() {
   const query = els.queryInput.value.trim();
-  const mode = "auto";
+  const mode = state.selectedMode;
 
   if (!query) {
     alert("Сначала введи запрос.");
@@ -710,8 +721,17 @@ function toggleHistory() {
     : "Свернуть ▴";
 }
 
+function setMode(mode) {
+  state.selectedMode = mode;
+  els.modeAiBtn.classList.toggle("active", mode === "ai_answer");
+  els.modePreciseBtn.classList.toggle("active", mode === "precise");
+}
+
 function bindEvents() {
   try {
+  els.modeAiBtn.addEventListener("click", () => setMode("ai_answer"));
+  els.modePreciseBtn.addEventListener("click", () => setMode("precise"));
+
   els.adminToggleBtn.addEventListener("click", () => {
     els.adminSection.classList.toggle("hidden");
     const open = !els.adminSection.classList.contains("hidden");
@@ -807,6 +827,9 @@ async function init() {
   els.refreshBootstrapBtn = document.getElementById("refreshBootstrapBtn");
   els.statusUpdatedAt = document.getElementById("statusUpdatedAt");
   els.statusBadges = document.getElementById("statusBadges");
+
+  els.modeAiBtn = document.getElementById("modeAiBtn");
+  els.modePreciseBtn = document.getElementById("modePreciseBtn");
 
   els.queryInput = document.getElementById("queryInput");
   els.runQueryBtn = document.getElementById("runQueryBtn");

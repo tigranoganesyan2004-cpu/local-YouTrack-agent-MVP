@@ -65,15 +65,23 @@ def check_ollama() -> bool:
 def _route_query(query: str, web_mode: str) -> str:
     query = query.strip()
 
-    if web_mode == "exact":
+    # Public mode: "precise" (Precise Mode button) — deterministic exact search, no LLM.
+    # Internal compat: "exact" still accepted from direct API callers.
+    if web_mode in {"precise", "exact"}:
         return f"точно {query}"
 
+    # Public mode: "ai_answer" (AI Answer button) — grounded LLM synthesis path.
+    if web_mode == "ai_answer":
+        return f"общий {query}"
+
+    # Internal compat only — not reachable from the public web UI.
     if web_mode == "llm":
         return f"общий {query}"
 
-    if web_mode == "deep":
-        return f"глубоко {query}"
+    # "deep" is intentionally not mapped from the public UI.
+    # Kept as a no-op guard so direct callers don't accidentally activate it.
 
+    # Default ("auto" / anything else) — NL intent detection decides internally.
     return query
 
 

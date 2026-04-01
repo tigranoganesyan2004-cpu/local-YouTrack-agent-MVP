@@ -1,0 +1,19 @@
+---
+description: Stage 1 chat and dataset lifecycle guard
+alwaysApply: true
+---
+
+
+# Stage 1 chat and dataset lifecycle
+
+Stage 1 must move toward:
+- one active dataset at a time
+- chat-first UI
+- chat_id and dataset_id boundaries
+- no mixing old chat context with new datasets
+- old chats should become archive/read-only once dataset changes
+
+Until full lifecycle is implemented:
+- do not introduce UI behavior that assumes multiple active datasets
+- do not continue old chat context across dataset changes
+- prefer simple and explicit dataset status over hidden logic

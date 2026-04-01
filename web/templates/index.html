@@ -42,6 +42,11 @@
           <div id="suggestionsBox" class="suggestions hidden"></div>
         </div>
 
+        <div class="mode-toggle" role="group" aria-label="Режим ответа">
+          <button id="modeAiBtn" class="btn btn-mode active" type="button">AI Answer</button>
+          <button id="modePreciseBtn" class="btn btn-mode" type="button">Precise Mode</button>
+        </div>
+
         <div class="query-actions">
           <button id="runQueryBtn" class="btn btn-primary" type="button">
             Запустить
@@ -136,11 +141,11 @@
               Обновить
             </button>
             <button id="historyToggleBtn" class="btn btn-secondary btn-sm" type="button">
-              Свернуть ▴
+              Развернуть ▾
             </button>
           </div>
         </div>
-        <div id="historyContainer" class="history-list"></div>
+        <div id="historyContainer" class="history-list hidden"></div>
       </section>
 
       <section class="panel panel-admin-wrap">
