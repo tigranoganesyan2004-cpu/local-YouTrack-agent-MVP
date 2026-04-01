@@ -7,7 +7,7 @@
     content="width=device-width, initial-scale=1, maximum-scale=1"
   />
   <title>YouTrack Agent</title>
-  <link rel="stylesheet" href="/static/style.css?v=4" />
+  <link rel="stylesheet" href="/static/style.css?v=6" />
 </head>
 <body>
   <div class="app-shell">
@@ -35,6 +35,7 @@
       </aside>
 
       <main class="layout">
+        <div id="chatArchiveNotice" class="chat-archive-notice hidden"></div>
         <div id="chatThread" class="chat-thread hidden"></div>
 
         <section class="panel panel-query">
@@ -57,6 +58,19 @@
           <div class="mode-toggle" role="group" aria-label="Режим ответа">
             <button id="modeAiBtn" class="btn btn-mode active" type="button">AI Answer</button>
             <button id="modePreciseBtn" class="btn btn-mode" type="button">Precise Mode</button>
+          </div>
+
+          <div id="preciseQuickActions" class="precise-quick-actions hidden" aria-label="Precise quick actions">
+            <div class="precise-quick-actions-title">Quick Actions</div>
+            <div id="preciseQuickActionsList" class="precise-quick-actions-list">
+              <button type="button" class="precise-quick-action" data-quick-action="task_by_id">Task by ID</button>
+              <button type="button" class="precise-quick-action" data-quick-action="approvals">Approvals</button>
+              <button type="button" class="precise-quick-action" data-quick-action="overdue">Overdue</button>
+              <button type="button" class="precise-quick-action" data-quick-action="deadlines">Deadlines</button>
+              <button type="button" class="precise-quick-action" data-quick-action="stats">Statistics</button>
+              <button type="button" class="precise-quick-action" data-quick-action="by_customer">By customer</button>
+              <button type="button" class="precise-quick-action" data-quick-action="by_responsible">By responsible</button>
+            </div>
           </div>
 
           <div class="query-actions">
@@ -176,6 +190,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=4" defer></script>
+  <script src="/static/app.js?v=6" defer></script>
 </body>
 </html>

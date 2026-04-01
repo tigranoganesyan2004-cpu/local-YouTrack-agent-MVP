@@ -7,6 +7,8 @@ const state = {
   selectedExampleCategoryId: null,
   selectedMode: "ai_answer",
   activeChatId: "",
+  activeChatArchived: false,
+  chatById: {},
   sidebarCollapsed: false,
 };
 
@@ -23,6 +25,22 @@ const FILTER_LABELS_RU = {
   doc_type: "тип документа",
   pending_approvals: "ожидаемые согласования",
   priority: "приоритет",
+};
+
+const PRECISE_QUICK_ACTIONS = {
+  task_by_id: "task_by_id",
+  approvals: "approvals",
+  overdue: "overdue",
+  deadlines: "deadlines",
+  stats: "stats",
+  by_customer: "by_customer",
+  by_responsible: "by_responsible",
+};
+
+const QUICK_ACTION_FALLBACKS = {
+  issue_id: "EAIST_SGL-350",
+  customer: "ГКУ",
+  responsible: "SAA_1",
 };
 
 function normalizeFilterLabel(value) {
@@ -157,6 +175,37 @@ function toggleSidebar() {
   els.sidebar.classList.remove("sidebar--mobile-open");
 }
 
+function buildChatMap(chats) {
+  const map = {};
+  if (!Array.isArray(chats)) return map;
+
+  chats.forEach(chat => {
+    const id = String(chat?.id || "").trim();
+    if (!id) return;
+    map[id] = chat;
+  });
+
+  return map;
+}
+
+function syncActiveChatArchivedFlag() {
+  const active = state.chatById[state.activeChatId];
+  state.activeChatArchived = Boolean(active && active.is_archived);
+}
+
+function renderArchiveNotice() {
+  if (!els.chatArchiveNotice) return;
+
+  if (!state.activeChatId || !state.activeChatArchived) {
+    els.chatArchiveNotice.textContent = "";
+    els.chatArchiveNotice.classList.add("hidden");
+    return;
+  }
+
+  els.chatArchiveNotice.textContent = "Архивный чат: только чтение. Новые сообщения будут записаны в новый чат текущего dataset.";
+  els.chatArchiveNotice.classList.remove("hidden");
+}
+
 async function loadChatList() {
   try {
     const chats = await apiGet("/api/chats?limit=50");
@@ -167,20 +216,29 @@ async function loadChatList() {
 }
 
 function renderChatList(chats) {
-  if (!Array.isArray(chats) || chats.length === 0) {
+  const rows = Array.isArray(chats) ? chats : [];
+  state.chatById = buildChatMap(rows);
+  syncActiveChatArchivedFlag();
+  renderArchiveNotice();
+
+  if (rows.length === 0) {
     els.chatList.innerHTML = `<div class="chat-list-empty">Нет чатов</div>`;
     return;
   }
 
-  els.chatList.innerHTML = chats.map(chat => {
+  els.chatList.innerHTML = rows.map(chat => {
     const isActive = chat.id === state.activeChatId;
+    const isArchived = Boolean(chat.is_archived);
     const title = chat.title || "Без названия";
     const time = chat.updated_at || "";
     return `
-      <div class="chat-item ${isActive ? "active" : ""}" data-chat-id="${escapeHtml(chat.id)}">
+      <div class="chat-item ${isActive ? "active" : ""} ${isArchived ? "archived" : ""}" data-chat-id="${escapeHtml(chat.id)}">
         <button type="button" class="chat-item-open" data-chat-id="${escapeHtml(chat.id)}">
           <div class="chat-item-body">
-            <div class="chat-item-title">${escapeHtml(title)}</div>
+            <div class="chat-item-title-row">
+              <div class="chat-item-title">${escapeHtml(title)}</div>
+              ${isArchived ? '<span class="chat-item-archived-tag">архив</span>' : ""}
+            </div>
             <div class="chat-item-time">${escapeHtml(time)}</div>
           </div>
         </button>
@@ -199,15 +257,19 @@ function renderChatList(chats) {
 
 async function createNewChat() {
   state.activeChatId = "";
+  state.activeChatArchived = false;
   els.queryInput.value = "";
   renderResult(null);
   renderChatThread([]);
+  renderArchiveNotice();
   highlightActiveChat();
   els.queryInput.focus();
 }
 
 async function openChat(chatId) {
   state.activeChatId = chatId;
+  syncActiveChatArchivedFlag();
+  renderArchiveNotice();
   highlightActiveChat();
 
   try {
@@ -231,8 +293,10 @@ async function deleteChat(chatId, chatTitle = "") {
 
   if (state.activeChatId === chatId) {
     state.activeChatId = "";
+    state.activeChatArchived = false;
     renderResult(null);
     renderChatThread([]);
+    renderArchiveNotice();
   }
   await loadChatList();
 }
@@ -245,12 +309,21 @@ function highlightActiveChat() {
 }
 
 async function ensureActiveChatSession(query) {
-  if (state.activeChatId) return state.activeChatId;
+  if (state.activeChatId) {
+    const activeMeta = state.chatById[state.activeChatId];
+    const isArchived = activeMeta ? Boolean(activeMeta.is_archived) : state.activeChatArchived;
+    if (!isArchived) return state.activeChatId;
+  }
 
   const title = query.length > 60 ? query.substring(0, 60) + "…" : query;
   const chat = await apiPost("/api/chats", { title });
   state.activeChatId = chat.id;
+  state.activeChatArchived = false;
+  renderResult(null);
+  renderChatThread([]);
   await loadChatList();
+  highlightActiveChat();
+  renderArchiveNotice();
   return chat.id;
 }
 
@@ -418,6 +491,52 @@ function renderExampleExamples(examples) {
       ${escapeHtml(example)}
     </button>
   `).join("");
+}
+
+function firstNonEmpty(values, fallback) {
+  if (!Array.isArray(values)) return fallback;
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (text) return text;
+  }
+  return fallback;
+}
+
+function quickActionDefaults() {
+  const lookups = state.bootstrap?.lookups || {};
+  return {
+    issueId: firstNonEmpty(lookups.ids, QUICK_ACTION_FALLBACKS.issue_id),
+    customer: firstNonEmpty(lookups.customers, QUICK_ACTION_FALLBACKS.customer),
+    responsible: firstNonEmpty(lookups.responsibles, QUICK_ACTION_FALLBACKS.responsible),
+  };
+}
+
+function buildQuickActionQuery(actionId) {
+  const defaults = quickActionDefaults();
+  switch (actionId) {
+    case PRECISE_QUICK_ACTIONS.task_by_id:
+      return `Покажи задачу ${defaults.issueId}`;
+    case PRECISE_QUICK_ACTIONS.approvals:
+      return "Что ждёт согласования от ДИТ?";
+    case PRECISE_QUICK_ACTIONS.overdue:
+      return "Какие задачи просрочены?";
+    case PRECISE_QUICK_ACTIONS.deadlines:
+      return "Какие сроки согласования истекают в ближайшие 7 дней?";
+    case PRECISE_QUICK_ACTIONS.stats:
+      return "Статистика по статусам";
+    case PRECISE_QUICK_ACTIONS.by_customer:
+      return `Задачи по заказчику ${defaults.customer} functional_customer="${defaults.customer}"`;
+    case PRECISE_QUICK_ACTIONS.by_responsible:
+      return `Задачи где ответственный ${defaults.responsible} responsible="${defaults.responsible}"`;
+    default:
+      return "";
+  }
+}
+
+function togglePreciseQuickActions(mode) {
+  if (!els.preciseQuickActions) return;
+  const isPrecise = mode === "precise";
+  els.preciseQuickActions.classList.toggle("hidden", !isPrecise);
 }
 
 function selectCategoryButton(categoryId) {
@@ -742,9 +861,13 @@ function parseSingleSseEvent(rawEvent) {
   return { eventName, data };
 }
 
-async function runQueryStream() {
-  const query = els.queryInput.value.trim();
-  const mode = state.selectedMode;
+async function runQueryStream(options = {}) {
+  const opts = options && typeof options === "object" && typeof options.preventDefault !== "function"
+    ? options
+    : {};
+
+  const query = String(opts.queryOverride || els.queryInput.value || "").trim();
+  const mode = String(opts.modeOverride || state.selectedMode || "").trim();
 
   if (!query) {
     alert("Введите запрос.");
@@ -836,6 +959,20 @@ async function runQueryStream() {
   }
 }
 
+async function runPreciseQuickAction(actionId) {
+  const query = buildQuickActionQuery(actionId);
+  if (!query) return;
+
+  els.queryInput.value = query;
+  closeSuggestions();
+  els.queryInput.focus();
+
+  await runQueryStream({
+    queryOverride: query,
+    modeOverride: "auto",
+  });
+}
+
 function stopQuery() {
   if (state.abortController) {
     state.abortController.abort();
@@ -891,6 +1028,7 @@ async function runPrepare() {
     const data = await apiPost("/api/prepare", {});
     showAdminLog(`Подготовка данных завершена. Всего задач: ${Number(data.tasks_total || 0)}`);
     await loadBootstrap();
+    await loadChatList();
   } catch (error) {
     showAdminLog(error.message || "Ошибка подготовки данных", "error");
   } finally {
@@ -915,6 +1053,7 @@ function setMode(mode) {
   state.selectedMode = mode;
   els.modeAiBtn.classList.toggle("active", mode === "ai_answer");
   els.modePreciseBtn.classList.toggle("active", mode === "precise");
+  togglePreciseQuickActions(mode);
 }
 
 // ── Events ──────────────────────────────────────────────────────
@@ -1013,6 +1152,17 @@ function bindEvents() {
       return;
     }
 
+    if (target.closest(".precise-quick-action")) {
+      const button = target.closest(".precise-quick-action");
+      const actionId = String(button.dataset.quickAction || "").trim();
+      if (!actionId) return;
+      if (state.selectedMode !== "precise") return;
+      runPreciseQuickAction(actionId).catch((error) => {
+        alert(`Ошибка запроса: ${error?.message || "не удалось выполнить Quick Action"}`);
+      });
+      return;
+    }
+
     if (
       !target.closest(".query-input-wrap") &&
       !target.closest(".suggestions")
@@ -1041,6 +1191,8 @@ async function init() {
   els.exportBtn = document.getElementById("exportBtn");
 
   els.suggestionsBox = document.getElementById("suggestionsBox");
+  els.preciseQuickActions = document.getElementById("preciseQuickActions");
+  els.preciseQuickActionsList = document.getElementById("preciseQuickActionsList");
 
   els.progressBox = document.getElementById("progressBox");
   els.progressText = document.getElementById("progressText");
@@ -1075,9 +1227,11 @@ async function init() {
   els.sidebarToggleBtn = document.getElementById("sidebarToggleBtn");
   els.newChatBtn = document.getElementById("newChatBtn");
   els.chatList = document.getElementById("chatList");
+  els.chatArchiveNotice = document.getElementById("chatArchiveNotice");
   els.chatThread = document.getElementById("chatThread");
 
   bindEvents();
+  setMode(state.selectedMode);
   renderResult(null);
 
   try {

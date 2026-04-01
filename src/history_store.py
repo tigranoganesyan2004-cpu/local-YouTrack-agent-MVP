@@ -2,7 +2,7 @@ import sqlite3
 import uuid
 
 from src.config import SQLITE_HISTORY_FILE
-from src.utils import ensure_dir, now_iso
+from src.utils import ensure_dir, now_iso, safe_str
 
 
 def _conn():
@@ -47,10 +47,12 @@ def init_history_db():
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            dataset_id TEXT NOT NULL DEFAULT ''
         )
         """
     )
+    _ensure_column(cur, "chat_sessions", "dataset_id", "TEXT DEFAULT ''")
 
     conn.commit()
     conn.close()
@@ -58,28 +60,64 @@ def init_history_db():
 
 # ── chat session CRUD ────────────────────────────────────────────
 
-def create_chat_session(title: str = "") -> dict:
+def _is_archived_for_active_dataset(chat_dataset_id: str, active_dataset_id: str) -> bool:
+    active_id = safe_str(active_dataset_id)
+    if not active_id:
+        return False
+    return safe_str(chat_dataset_id) != active_id
+
+
+def create_chat_session(title: str = "", dataset_id: str = "") -> dict:
     chat_id = uuid.uuid4().hex[:16]
     ts = now_iso()
+    ds_id = safe_str(dataset_id)
     conn = _conn()
     conn.execute(
-        "INSERT INTO chat_sessions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
-        (chat_id, title, ts, ts),
+        "INSERT INTO chat_sessions (id, title, created_at, updated_at, dataset_id) VALUES (?, ?, ?, ?, ?)",
+        (chat_id, title, ts, ts, ds_id),
     )
     conn.commit()
     conn.close()
-    return {"id": chat_id, "title": title, "created_at": ts, "updated_at": ts}
+    return {"id": chat_id, "title": title, "created_at": ts, "updated_at": ts, "dataset_id": ds_id}
 
 
-def list_chat_sessions(limit: int = 50) -> list[dict]:
+def list_chat_sessions(limit: int = 50, active_dataset_id: str = "") -> list[dict]:
     conn = _conn()
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
-        "SELECT id, title, created_at, updated_at FROM chat_sessions ORDER BY updated_at DESC LIMIT ?",
+        "SELECT id, title, created_at, updated_at, dataset_id FROM chat_sessions ORDER BY updated_at DESC LIMIT ?",
         (limit,),
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+
+    result = []
+    for row in rows:
+        item = dict(row)
+        item["dataset_id"] = safe_str(item.get("dataset_id"))
+        item["is_archived"] = _is_archived_for_active_dataset(item["dataset_id"], active_dataset_id)
+        result.append(item)
+
+    return result
+
+
+def is_chat_session_live(chat_id: str, active_dataset_id: str) -> bool:
+    chat_id = safe_str(chat_id)
+    if not chat_id:
+        return False
+
+    conn = _conn()
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT dataset_id FROM chat_sessions WHERE id = ?",
+        (chat_id,),
+    ).fetchone()
+    conn.close()
+
+    if row is None:
+        return False
+
+    dataset_id = safe_str(row["dataset_id"])
+    return not _is_archived_for_active_dataset(dataset_id, active_dataset_id)
 
 
 def get_chat_messages(chat_id: str) -> list[dict]:

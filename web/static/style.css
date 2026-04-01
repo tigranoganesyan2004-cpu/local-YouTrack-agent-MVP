@@ -202,6 +202,13 @@ button {
   min-width: 0;
 }
 
+.chat-item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .chat-item-title {
   font-size: 13px;
   font-weight: 600;
@@ -209,6 +216,19 @@ button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.chat-item-archived-tag {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(217, 164, 65, 0.55);
+  background: rgba(217, 164, 65, 0.18);
+  color: #f0cd86;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .chat-item-time {
@@ -242,6 +262,17 @@ button {
   flex-direction: column;
   gap: 14px;
   margin-bottom: 14px;
+}
+
+.chat-archive-notice {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(217, 164, 65, 0.45);
+  background: rgba(217, 164, 65, 0.14);
+  color: #f0cd86;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .chat-msg {
@@ -580,6 +611,43 @@ button {
   background: rgba(79, 140, 255, 0.15);
   border-color: var(--primary);
   color: var(--primary);
+}
+
+.precise-quick-actions {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.precise-quick-actions-title {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+.precise-quick-actions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.precise-quick-action {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(79, 140, 255, 0.09);
+  color: var(--text);
+  padding: 8px 12px;
+  min-height: 34px;
+  font-size: 13px;
+}
+
+.precise-quick-action:hover:not(:disabled) {
+  border-color: rgba(79, 140, 255, 0.5);
+  background: rgba(79, 140, 255, 0.16);
 }
 
 .suggestions {
@@ -1018,6 +1086,7 @@ button {
   .status-badges,
   .example-categories,
   .example-examples,
+  .precise-quick-actions-list,
   .admin-actions {
     flex-direction: column;
     align-items: stretch;

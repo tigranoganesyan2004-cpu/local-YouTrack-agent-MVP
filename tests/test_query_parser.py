@@ -370,3 +370,44 @@ class TestCurrentApprovalStage:
         r = detect_intent("список стадия=ДИТ приоритет=Высокий")
         assert r["filters"].get("current_approval_stage") == "ДИТ"
         assert r["filters"].get("priority") == "Высокий"
+
+
+class TestQuickActionTemplates:
+    """Regression tests for fixed quick-action templates used in Precise Mode UI."""
+
+    def test_quick_action_task_by_id(self):
+        r = detect_intent("\u041f\u043e\u043a\u0430\u0436\u0438 \u0437\u0430\u0434\u0430\u0447\u0443 EAIST_SGL-350")
+        assert r["mode"] == "task_by_id"
+        assert r["issue_id"] == "EAIST_SGL-350"
+
+    def test_quick_action_approvals(self):
+        r = detect_intent("\u0427\u0442\u043e \u0436\u0434\u0451\u0442 \u0441\u043e\u0433\u043b\u0430\u0441\u043e\u0432\u0430\u043d\u0438\u044f \u043e\u0442 \u0414\u0418\u0422?")
+        assert r["mode"] == "approval_status"
+        assert r.get("department") == "dit"
+
+    def test_quick_action_overdue(self):
+        r = detect_intent("\u041a\u0430\u043a\u0438\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 \u043f\u0440\u043e\u0441\u0440\u043e\u0447\u0435\u043d\u044b?")
+        assert r["mode"] == "overdue"
+
+    def test_quick_action_deadlines(self):
+        r = detect_intent("\u041a\u0430\u043a\u0438\u0435 \u0441\u0440\u043e\u043a\u0438 \u0441\u043e\u0433\u043b\u0430\u0441\u043e\u0432\u0430\u043d\u0438\u044f \u0438\u0441\u0442\u0435\u043a\u0430\u044e\u0442 \u0432 \u0431\u043b\u0438\u0436\u0430\u0439\u0448\u0438\u0435 7 \u0434\u043d\u0435\u0439?")
+        assert r["mode"] == "deadlines"
+        assert r["days"] == 7
+
+    def test_quick_action_stats(self):
+        r = detect_intent("\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430 \u043f\u043e \u0441\u0442\u0430\u0442\u0443\u0441\u0430\u043c")
+        assert r["mode"] == "stats"
+        assert r["field"] == "status"
+
+    def test_quick_action_by_customer(self):
+        r = detect_intent(
+            "\u0417\u0430\u0434\u0430\u0447\u0438 \u043f\u043e \u0437\u0430\u043a\u0430\u0437\u0447\u0438\u043a\u0443 "
+            "\u0413\u041a\u0423 functional_customer=\"\u0413\u041a\u0423\""
+        )
+        assert r["mode"] == "by_customer"
+        assert r.get("filters", {}).get("functional_customer") == "\u0413\u041a\u0423"
+
+    def test_quick_action_by_responsible(self):
+        r = detect_intent("\u0417\u0430\u0434\u0430\u0447\u0438 \u0433\u0434\u0435 \u043e\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u0439 SAA_1")
+        assert r["mode"] == "by_responsible"
+        assert r.get("filters", {}).get("responsible_dit") == "SAA_1"

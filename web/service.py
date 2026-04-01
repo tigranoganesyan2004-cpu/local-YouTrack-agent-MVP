@@ -17,6 +17,7 @@ from src.history_store import (
     delete_chat_session,
     get_chat_messages,
     get_last_history,
+    is_chat_session_live,
     list_chat_sessions,
     save_history,
 )
@@ -53,6 +54,22 @@ _UI_CACHE = {
     "report_mtime": None,
     "payload": None,
 }
+
+
+def _current_active_dataset_id() -> str:
+    active_dataset = load_active_dataset_metadata()
+    return safe_str(active_dataset.get("dataset_id"))
+
+
+def _resolve_live_chat_id(chat_id: str, active_dataset_id: str) -> str:
+    chat_id = safe_str(chat_id)
+    if not chat_id:
+        return ""
+
+    if is_chat_session_live(chat_id, active_dataset_id):
+        return chat_id
+
+    return ""
 
 
 def check_ollama() -> bool:
@@ -723,12 +740,14 @@ def stream_agent_service(query: str, web_mode: str, chat_id: str = "") -> Genera
     routed_query = _route_query(query, web_mode)
     intent = detect_intent(routed_query)
     intent_mode = intent["mode"]
+    active_dataset_id = _current_active_dataset_id()
+    live_chat_id = _resolve_live_chat_id(chat_id, active_dataset_id)
 
     if intent_mode not in _STREAMING_MODES:
         result = run_agent(routed_query)
         yield f"event: result\ndata: {json.dumps(result, ensure_ascii=False)}\n\n"
         yield "event: done\ndata: {}\n\n"
-        _save_stream_history(routed_query, intent_mode, result, [], started, llm_used=0, chat_id=chat_id)
+        _save_stream_history(routed_query, intent_mode, result, [], started, llm_used=0, chat_id=live_chat_id)
         return
 
     search_query = intent.get("query", routed_query)
@@ -748,7 +767,7 @@ def stream_agent_service(query: str, web_mode: str, chat_id: str = "") -> Genera
         yield f"event: result\ndata: {json.dumps(result, ensure_ascii=False)}\n\n"
         yield "event: done\ndata: {}\n\n"
 
-        _save_stream_history(routed_query, intent_mode, result, retrieved_ids, started, llm_used=0, chat_id=chat_id)
+        _save_stream_history(routed_query, intent_mode, result, retrieved_ids, started, llm_used=0, chat_id=live_chat_id)
         return
 
     prompt = build_llm_prompt(routed_query, tasks, intent_mode)
@@ -772,7 +791,7 @@ def stream_agent_service(query: str, web_mode: str, chat_id: str = "") -> Genera
         yield f"event: result\ndata: {json.dumps(result, ensure_ascii=False)}\n\n"
         yield "event: done\ndata: {}\n\n"
 
-        _save_stream_history(routed_query, intent_mode, result, retrieved_ids, started, llm_used=0, chat_id=chat_id)
+        _save_stream_history(routed_query, intent_mode, result, retrieved_ids, started, llm_used=0, chat_id=live_chat_id)
         return
 
     llm_used = 0
@@ -796,7 +815,7 @@ def stream_agent_service(query: str, web_mode: str, chat_id: str = "") -> Genera
     yield f"event: result\ndata: {json.dumps(result, ensure_ascii=False)}\n\n"
     yield "event: done\ndata: {}\n\n"
 
-    _save_stream_history(routed_query, intent_mode, result, retrieved_ids, started, llm_used=llm_used, chat_id=chat_id)
+    _save_stream_history(routed_query, intent_mode, result, retrieved_ids, started, llm_used=llm_used, chat_id=live_chat_id)
 
 
 def _save_stream_history(
@@ -827,11 +846,11 @@ def _save_stream_history(
 # ── chat session service layer ───────────────────────────────────
 
 def create_chat_action(title: str = "") -> dict:
-    return create_chat_session(title=title)
+    return create_chat_session(title=title, dataset_id=_current_active_dataset_id())
 
 
 def list_chats_action(limit: int = 50) -> list[dict]:
-    return list_chat_sessions(limit=limit)
+    return list_chat_sessions(limit=limit, active_dataset_id=_current_active_dataset_id())
 
 
 def get_chat_messages_action(chat_id: str) -> list[dict]:
@@ -840,5 +859,4 @@ def get_chat_messages_action(chat_id: str) -> list[dict]:
 
 def delete_chat_action(chat_id: str) -> bool:
     return delete_chat_session(chat_id)
-
 
